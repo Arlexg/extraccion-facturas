@@ -5,13 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Registro de Comprobantes SUNAT</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
-  // Configurar worker de PDF.js inmediatamente después de cargarlo
   if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
   }
 </script>
 <style>
@@ -36,138 +34,42 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font);
-    min-height: 100vh;
-    padding: 24px 16px 60px;
-  }
-
-  header {
-    max-width: 700px;
-    margin: 0 auto 28px;
-    display: flex; align-items: center; gap: 14px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .logo {
-    width: 42px; height: 42px;
-    background: var(--accent); border-radius: 10px;
-    display: grid; place-items: center;
-    font-size: 20px; flex-shrink: 0;
-  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; padding: 24px 16px 60px; }
+  header { max-width: 800px; margin: 0 auto 28px; display: flex; align-items: center; gap: 14px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .logo { width: 42px; height: 42px; background: var(--accent); border-radius: 10px; display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
   header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
   header p  { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-
-  .container { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .card-header {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 600; font-size: 0.88rem;
-  }
-  .card-header .step {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--accent-dim); color: var(--accent);
-    font-size: 0.7rem; font-weight: 700;
-    display: grid; place-items: center; flex-shrink: 0;
-  }
+  .container { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.88rem; }
+  .card-header .step { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font-size: 0.7rem; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
   .card-body { padding: 20px; }
-
-  /* ── Tabs de modo escáner ── */
-  .mode-tabs {
-    display: flex; gap: 8px; margin-bottom: 16px;
-  }
-  .mode-tab {
-    flex: 1; padding: 10px 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--muted);
-    font-family: var(--font); font-size: 0.82rem; font-weight: 600;
-    cursor: pointer; text-align: center;
-    transition: all .15s;
-  }
-  .mode-tab.active {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  /* ── Paneles de modo ── */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .mode-tab { flex: 1; padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); font-family: var(--font); font-size: 0.82rem; font-weight: 600; cursor: pointer; text-align: center; transition: all .15s; }
+  .mode-tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
   .mode-panel { display: none; }
   .mode-panel.active { display: block; }
-
-  /* ── Área cámara/imagen ── */
   #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 180px; }
-
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: 8px;
-    padding: 32px 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s;
-    position: relative;
-  }
+  .upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 32px 20px; text-align: center; cursor: pointer; transition: border-color .2s; position: relative; }
   .upload-zone:hover { border-color: var(--accent); }
-  .upload-zone input[type=file] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .upload-zone .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
   .upload-zone p { color: var(--muted); font-size: 0.85rem; }
   .upload-zone span { color: var(--accent); font-weight: 600; }
-
-  #previewImg {
-    width: 100%; border-radius: 8px; margin-top: 12px;
-    display: none; max-height: 300px; object-fit: contain;
-  }
-
-  /* ── OCR Progress ── */
-  .ocr-progress {
-    margin-top: 12px; display: none;
-  }
-  .ocr-bar-wrap {
-    background: var(--bg); border-radius: 20px; height: 6px; overflow: hidden;
-  }
-  .ocr-bar {
-    height: 100%; background: var(--accent);
-    border-radius: 20px; width: 0%;
-    transition: width .3s ease;
-  }
+  #previewImg, #previewOCR { width: 100%; border-radius: 8px; margin-top: 12px; display: none; max-height: 300px; object-fit: contain; }
+  .ocr-progress { margin-top: 12px; display: none; }
+  .ocr-bar-wrap { background: var(--bg); border-radius: 20px; height: 6px; overflow: hidden; }
+  .ocr-bar { height: 100%; background: var(--accent); border-radius: 20px; width: 0%; transition: width .3s ease; }
   .ocr-label { font-size: 0.75rem; color: var(--muted); margin-top: 6px; text-align: center; }
-
-  /* ── Botones ── */
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 10px 18px; border: none; border-radius: 8px;
-    font-family: var(--font); font-size: 0.85rem; font-weight: 600;
-    cursor: pointer; transition: opacity .15s, transform .1s;
-  }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border: none; border-radius: 8px; font-family: var(--font); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; }
   .btn:active { transform: scale(0.97); }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-ghost   { background: var(--border); color: var(--label); }
   .btn-success { background: var(--success); color: #fff; }
   .btn-danger  { background: var(--error); color: #fff; }
-  .btn-warn    { background: var(--warn); color: #000; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
   .scanner-controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-
-  /* ── Status badge ── */
-  .status {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 20px;
-    font-size: 0.78rem; font-weight: 600; margin-top: 12px;
-  }
+  .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; margin-top: 12px; }
   .status-idle     { background: #1e2030; color: var(--muted); }
   .status-scanning { background: #1e3a6e; color: var(--accent); }
   .status-ocr      { background: #2a1f00; color: var(--warn); }
@@ -177,86 +79,54 @@
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .dot-pulse { animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-
-  /* ── Alerta OCR ── */
-  .ocr-alert {
-    display: none;
-    margin-top: 14px;
-    background: #2a1f00; border: 1px solid var(--warn);
-    border-radius: 8px; padding: 12px 14px;
-    font-size: 0.82rem; color: var(--warn); line-height: 1.5;
-  }
+  .ocr-alert { display: none; margin-top: 14px; background: #2a1f00; border: 1px solid var(--warn); border-radius: 8px; padding: 12px 14px; font-size: 0.82rem; color: var(--warn); line-height: 1.5; }
   .ocr-alert.show { display: block; }
-
-  /* ── Formulario ── */
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .form-grid .full { grid-column: 1 / -1; }
+  
+  /* Formulario ampliado */
+  .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .form-grid .col-4 { grid-column: span 4; }
+  .form-grid .col-3 { grid-column: span 3; }
+  .form-grid .col-2 { grid-column: span 2; }
+  .form-grid .col-1 { grid-column: span 1; }
+  
   label { display: block; font-size: 0.75rem; color: var(--label); margin-bottom: 5px; font-weight: 500; }
-  input, select {
-    width: 100%; padding: 9px 12px;
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 7px; color: var(--text);
-    font-family: var(--font); font-size: 0.85rem;
-    transition: border-color .15s;
-  }
+  input, select { width: 100%; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-family: var(--font); font-size: 0.85rem; transition: border-color .15s; }
   input:focus, select:focus { outline: none; border-color: var(--accent); }
   input.filled  { border-color: var(--success); background: #0d1f17; }
   input.ocr-filled { border-color: var(--warn); background: #1a1400; }
   .mono-field { font-family: var(--mono); letter-spacing: 0.04em; }
-
-  /* ── Tabla ── */
+  
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-  thead th {
-    text-align: left; padding: 10px 12px;
-    color: var(--muted); font-weight: 600; font-size: 0.73rem;
-    text-transform: uppercase; letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border);
-  }
+  thead th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 600; font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
   tbody tr { border-bottom: 1px solid #1e2030; transition: background .1s; }
   tbody tr:hover { background: #1e2030; }
-  tbody td { padding: 10px 12px; }
-
+  tbody td { padding: 10px 12px; white-space: nowrap; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; font-family: var(--mono); }
   .badge-01 { background: #1a2e5a; color: #93c5fd; }
   .badge-03 { background: #2a1a1a; color: #fca5a5; }
-  .badge-07 { background: #1a2a1a; color: #86efac; }
   .badge-ocr{ background: #2a1f00; color: var(--warn); font-size: 0.65rem; margin-left: 4px; }
-
-  .total-cell { font-family: var(--mono); font-weight: 600; }
   .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 0.85rem; }
   .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
-
-  /* ── Stats ── */
   .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; }
   .stat .val { font-size: 1.4rem; font-weight: 700; font-family: var(--mono); }
   .stat .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-
-  /* ── Divider ── */
-  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.75rem; margin: 16px 0 4px; }
-  .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
-
-  /* ── Toast ── */
-  #toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 20px;
-    font-size: 0.85rem; font-weight: 500;
-    display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
-    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-    z-index: 999;
-  }
+  .section-title { font-size: 0.8rem; font-weight: 600; color: var(--accent); margin: 10px 0 5px; grid-column: span 4; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+  
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 20px; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.5); transition: transform .3s cubic-bezier(.34,1.56,.64,1); z-index: 999; }
   #toast.show { transform: translateX(-50%) translateY(0); }
   #toast.t-ok   { border-color: var(--success); }
   #toast.t-warn { border-color: var(--warn); }
   #toast.t-err  { border-color: var(--error); }
 
+  @media (max-width: 768px) {
+    .form-grid .col-2, .form-grid .col-3, .form-grid .col-4 { grid-column: span 4; }
+    .form-grid .col-1 { grid-column: span 2; }
+  }
   @media (max-width: 480px) {
-    .form-grid { grid-template-columns: 1fr; }
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-    .mode-tab { font-size: 0.75rem; padding: 8px 4px; }
+    .form-grid .col-1 { grid-column: span 4; }
+    .stats-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -265,96 +135,62 @@
 <header>
   <div class="logo">🧾</div>
   <div>
-    <h1>Registro de Comprobantes SUNAT</h1>
-    <p>QR instantáneo · OCR para comprobantes sin QR · 100% gratuito</p>
+    <h1>Registro de Comprobantes FríoTech</h1>
+    <p>Captura total de datos PDF nativos y QR</p>
   </div>
 </header>
 
 <div class="container">
-
-  <!-- ══ PASO 1: CAPTURA ══ -->
   <div class="card">
-    <div class="card-header">
-      <span class="step">1</span>
-      Capturar comprobante
-    </div>
+    <div class="card-header"><span class="step">1</span> Capturar documento</div>
     <div class="card-body">
-
-      <!-- Tabs de modo -->
       <div class="mode-tabs">
-        <button class="mode-tab active" onclick="cambiarModo('qr-camara')" id="tab-qr-camara">📷 QR con cámara</button>
-        <button class="mode-tab" onclick="cambiarModo('qr-imagen')"  id="tab-qr-imagen">🖼 QR desde imagen</button>
-        <button class="mode-tab" onclick="cambiarModo('ocr-imagen')" id="tab-ocr-imagen">🔍 OCR (sin QR)</button>
+        <button class="mode-tab active" onclick="cambiarModo('ocr-imagen')" id="tab-ocr-imagen">📄 Extraer PDF / Imagen</button>
+        <button class="mode-tab" onclick="cambiarModo('qr-camara')" id="tab-qr-camara">📷 Escanear QR</button>
       </div>
 
-      <!-- MODO 1: Cámara QR -->
-      <div class="mode-panel active" id="panel-qr-camara">
+      <div class="mode-panel" id="panel-qr-camara">
         <div id="reader"></div>
         <div class="scanner-controls">
           <button class="btn btn-primary" id="btnIniciar" onclick="iniciarEscaner()">📷 Iniciar cámara</button>
-          <button class="btn btn-ghost"   id="btnDetener" onclick="detenerEscaner()" disabled>⏹ Detener</button>
-          <button class="btn btn-ghost"   onclick="limpiarFormulario()">🔄 Limpiar</button>
+          <button class="btn btn-ghost" id="btnDetener" onclick="detenerEscaner()" disabled>⏹ Detener</button>
         </div>
       </div>
 
-      <!-- MODO 2: Imagen con QR -->
-      <div class="mode-panel" id="panel-qr-imagen">
-        <div class="upload-zone" id="dropQR">
-          <input type="file" accept="image/*" onchange="leerQRDesdeImagen(event)" id="inputQR">
-          <span class="icon">📎</span>
-          <p>Arrastra o <span>selecciona una foto</span> del comprobante con QR</p>
-        </div>
-        <img id="previewQR" style="display:none; width:100%; border-radius:8px; margin-top:12px; max-height:260px; object-fit:contain;">
-      </div>
-
-      <!-- MODO 3: OCR (sin QR) — acepta imagen Y PDF -->
-      <div class="mode-panel" id="panel-ocr-imagen">
+      <div class="mode-panel active" id="panel-ocr-imagen">
         <div class="upload-zone" id="dropOCR">
-          <input type="file" accept="image/*,application/pdf" onchange="procesarConOCR(event)" id="inputOCR">
-          <span class="icon">🔍</span>
-          <p>Arrastra o <span>selecciona imagen o PDF</span> del comprobante</p>
-          <p style="margin-top:6px; font-size:0.72rem; color:var(--muted)">JPG · PNG · PDF — tickets, boletas manuales, facturas antiguas</p>
+          <input type="file" accept="image/*,application/pdf" onchange="procesarArchivo(event)" id="inputOCR">
+          <span class="icon">📄</span>
+          <p>Arrastra o <span>selecciona el PDF o Imagen</span> de la factura</p>
         </div>
-
-        <!-- Preview imagen -->
-        <img id="previewOCR" style="display:none; width:100%; border-radius:8px; margin-top:12px; max-height:260px; object-fit:contain;">
-
-        <!-- Preview PDF (canvas) -->
+        <img id="previewOCR">
         <div id="pdfPreviewWrap" style="display:none; margin-top:12px;">
-          <div style="font-size:0.75rem; color:var(--muted); margin-bottom:6px;">📄 Vista previa del PDF (página 1)</div>
           <canvas id="pdfCanvas" style="width:100%; border-radius:8px; border:1px solid var(--border);"></canvas>
-          <div id="pdfPaginas" style="font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center;"></div>
         </div>
-
         <div class="ocr-progress" id="ocrProgress">
           <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
-          <div class="ocr-label" id="ocrLabel">Iniciando OCR…</div>
+          <div class="ocr-label" id="ocrLabel">Analizando documento…</div>
         </div>
-        <div class="ocr-alert" id="ocrAlert" style="display:none">
-          ⚠ <strong>Modo OCR activo:</strong> Los campos se llenaron automáticamente pero pueden tener errores de lectura. <strong>Revisa cada campo antes de guardar.</strong>
+        <div class="ocr-alert" id="ocrAlert">
+          ⚠ <strong>Revisión necesaria:</strong> Campos autocompletados. Revisa la precisión antes de guardar.
         </div>
       </div>
 
-      <!-- Status global -->
       <div id="statusBadge" class="status status-idle">
-        <span class="dot"></span>
-        <span id="statusText">Listo</span>
+        <span class="dot"></span><span id="statusText">Listo</span>
       </div>
-
     </div>
   </div>
 
-  <!-- ══ PASO 2: FORMULARIO ══ -->
   <div class="card">
     <div class="card-header">
-      <span class="step">2</span>
-      Datos del comprobante
+      <span class="step">2</span> Datos del comprobante
       <span id="fuenteTag" style="margin-left:auto; font-size:0.72rem; color:var(--muted);"></span>
     </div>
     <div class="card-body">
       <div class="form-grid">
-
-        <div>
+        <div class="section-title">Datos del Documento</div>
+        <div class="col-2">
           <label>Tipo de comprobante</label>
           <select id="tipo">
             <option value="">— Seleccionar —</option>
@@ -362,646 +198,370 @@
             <option value="03">03 · Boleta de Venta</option>
             <option value="07">07 · Nota de Crédito</option>
             <option value="08">08 · Nota de Débito</option>
-            <option value="XX">Otro / No identificado</option>
+            <option value="XX">Otro</option>
           </select>
         </div>
-
-        <div>
-          <label>Fecha de emisión</label>
+        <div class="col-1">
+          <label>Fecha Emisión</label>
           <input type="date" id="fecha" />
         </div>
-
-        <div>
-          <label>Serie</label>
-          <input type="text" id="serie" placeholder="F001 / B001" class="mono-field" maxlength="6" />
+        <div class="col-1">
+          <label>Moneda</label>
+          <select id="moneda">
+            <option value="PEN">Soles (PEN)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
         </div>
-
-        <div>
+        <div class="col-2">
+          <label>Serie</label>
+          <input type="text" id="serie" placeholder="F001" class="mono-field" maxlength="4" />
+        </div>
+        <div class="col-2">
           <label>Número</label>
           <input type="text" id="numero" placeholder="00001234" class="mono-field" maxlength="10" />
         </div>
 
-        <div class="full">
-          <label>RUC del Emisor</label>
-          <input type="text" id="rucEmisor" placeholder="20XXXXXXXXX" class="mono-field" maxlength="11" />
+        <div class="section-title">Datos del Emisor (Proveedor)</div>
+        <div class="col-1">
+          <label>RUC Emisor</label>
+          <input type="text" id="rucEmisor" placeholder="20..." class="mono-field" maxlength="11" />
+        </div>
+        <div class="col-3">
+          <label>Razón Social Emisor</label>
+          <input type="text" id="razonSocialEmisor" placeholder="Nombre de la empresa que emite" />
         </div>
 
-        <div>
-          <label>IGV (S/.)</label>
-          <input type="number" id="igv" placeholder="0.00" step="0.01" min="0" />
+        <div class="section-title">Datos del Cliente (Receptor)</div>
+        <div class="col-1">
+          <label>RUC Cliente</label>
+          <input type="text" id="rucCliente" placeholder="20..." class="mono-field" maxlength="11" />
+        </div>
+        <div class="col-3">
+          <label>Razón Social Cliente</label>
+          <input type="text" id="razonSocialCliente" placeholder="Nombre del cliente" />
         </div>
 
-        <div>
-          <label>Total (S/.)</label>
-          <input type="number" id="total" placeholder="0.00" step="0.01" min="0" />
+        <div class="section-title">Montos y Adicionales</div>
+        <div class="col-1">
+          <label>Op. Gravadas (Subtotal)</label>
+          <input type="number" id="subtotal" placeholder="0.00" step="0.01" />
         </div>
-
-        <div class="full">
-          <label>Descripción / Proveedor <span style="color:var(--muted)">(opcional)</span></label>
-          <input type="text" id="descripcion" placeholder="Ej: Factura de servicios - Empresa SAC" />
+        <div class="col-1">
+          <label>IGV (18%)</label>
+          <input type="number" id="igv" placeholder="0.00" step="0.01" />
         </div>
-
+        <div class="col-1">
+          <label>Total</label>
+          <input type="number" id="total" placeholder="0.00" step="0.01" />
+        </div>
+        <div class="col-1">
+          <label>Forma de Pago</label>
+          <select id="formaPago">
+            <option value="Contado">Contado</option>
+            <option value="Credito">Crédito</option>
+            <option value="">No especificado</option>
+          </select>
+        </div>
+        <div class="col-4">
+          <label>Descripción / Glosa</label>
+          <input type="text" id="descripcion" placeholder="Ej: Mantenimiento preventivo equipo de frío..." />
+        </div>
       </div>
 
       <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-success" id="btnGuardar" onclick="guardarComprobante()">
-          💾 Guardar comprobante
-        </button>
-        <button class="btn btn-ghost" onclick="limpiarFormulario()">
-          🔄 Limpiar campos
-        </button>
+        <button class="btn btn-success" id="btnGuardar" onclick="guardarComprobante()">💾 Guardar comprobante</button>
+        <button class="btn btn-ghost" onclick="limpiarFormulario()">🔄 Limpiar</button>
       </div>
     </div>
   </div>
 
-  <!-- ══ RESUMEN ══ -->
   <div class="card">
-    <div class="card-header"><span class="step">3</span> Resumen</div>
-    <div class="card-body">
-      <div class="stats-grid">
-        <div class="stat"><div class="val" id="statTotal">S/ 0</div><div class="lbl">Total registrado</div></div>
-        <div class="stat"><div class="val" id="statIgv">S/ 0</div><div class="lbl">IGV acumulado</div></div>
-        <div class="stat"><div class="val" id="statCount">0</div><div class="lbl">Comprobantes</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ REGISTROS ══ -->
-  <div class="card">
-    <div class="card-header">
-      📋 Registros guardados
-      <span style="margin-left:auto;">
-        <button class="btn btn-ghost" onclick="exportarCSV()" style="padding:6px 12px; font-size:0.75rem;">⬇ Exportar CSV</button>
-      </span>
-    </div>
+    <div class="card-header">📋 Registros guardados</div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Tipo</th>
-            <th>Fecha</th>
-            <th>Serie-Número</th>
-            <th>RUC Emisor</th>
-            <th>IGV</th>
-            <th>Total</th>
-            <th>Fuente</th>
-            <th></th>
+            <th>Tipo</th><th>Serie-N°</th><th>Emisor</th><th>Cliente</th><th>Moneda</th><th>Total</th><th>Fuente</th><th></th>
           </tr>
         </thead>
-        <tbody id="tablaRegistros">
-          <tr><td colspan="8"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>
-        </tbody>
+        <tbody id="tablaRegistros"></tbody>
       </table>
     </div>
   </div>
-
 </div>
 
 <div id="toast"><span id="toastMsg"></span></div>
 
 <script>
 // ══════════════════════════════════════════════
-// CONFIGURACIÓN
+// CONFIGURACIÓN (Pega aquí la URL de tu App Script)
 // ══════════════════════════════════════════════
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbybCseypg7YLHDZ2r5HvFa90Aew2xOTWdYzqeQp6apF96yNBW_QBDoBxjU5i4KIUc6Q_Q/exec";
 
-// ══════════════════════════════════════════════
-// ESTADO
-// ══════════════════════════════════════════════
-let html5QrCode  = null;
-let scannerActivo = false;
-let modoActual   = 'qr-camara';
-let fuenteActual = 'manual'; // 'qr' | 'ocr' | 'manual'
-let registros    = JSON.parse(localStorage.getItem('comprobantes') || '[]');
+let html5QrCode = null; let scannerActivo = false; let fuenteActual = 'manual';
+let registros = JSON.parse(localStorage.getItem('comprobantes') || '[]');
 
-// ══════════════════════════════════════════════
-// TABS / MODOS
-// ══════════════════════════════════════════════
 function cambiarModo(modo) {
   if (scannerActivo) detenerEscaner();
-  modoActual = modo;
   document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-'  + modo).classList.add('active');
-  document.getElementById('panel-'+ modo).classList.add('active');
+  document.getElementById('tab-' + modo).classList.add('active');
+  document.getElementById('panel-' + modo).classList.add('active');
   setStatus('idle','Listo');
 }
 
-// ══════════════════════════════════════════════
-// MODO 1: ESCÁNER QR CON CÁMARA
-// ══════════════════════════════════════════════
+// ── ESCÁNER QR ──
 async function iniciarEscaner() {
-  setStatus('scanning','Buscando código QR…');
-  document.getElementById('btnIniciar').disabled = true;
-  document.getElementById('btnDetener').disabled = false;
+  setStatus('scanning','Buscando QR…');
+  document.getElementById('btnIniciar').disabled = true; document.getElementById('btnDetener').disabled = false;
   try {
     html5QrCode = new Html5Qrcode("reader");
-    await html5QrCode.start(
-      { facingMode:"environment" },
-      { fps:10, qrbox:{width:250,height:250} },
-      onQRLeido, ()=>{}
-    );
+    await html5QrCode.start({ facingMode:"environment" }, { fps:10, qrbox:{width:250,height:250} }, onQRLeido, ()=>{});
     scannerActivo = true;
   } catch {
-    setStatus('error','No se pudo acceder a la cámara');
-    document.getElementById('btnIniciar').disabled = false;
-    document.getElementById('btnDetener').disabled = true;
-    mostrarToast('err','❌ Permiso de cámara denegado');
+    setStatus('error','Cámara denegada'); mostrarToast('err','❌ Permiso de cámara denegado');
   }
 }
-
 async function detenerEscaner() {
-  if (html5QrCode && scannerActivo) {
-    await html5QrCode.stop();
-    html5QrCode.clear();
-    scannerActivo = false;
-  }
-  setStatus('idle','Cámara inactiva');
-  document.getElementById('btnIniciar').disabled  = false;
-  document.getElementById('btnDetener').disabled = true;
+  if (html5QrCode && scannerActivo) { await html5QrCode.stop(); html5QrCode.clear(); scannerActivo = false; }
+  setStatus('idle','Cámara inactiva'); document.getElementById('btnIniciar').disabled = false; document.getElementById('btnDetener').disabled = true;
 }
 
-// ══════════════════════════════════════════════
-// MODO 2: QR DESDE IMAGEN (sin cámara)
-// ══════════════════════════════════════════════
-async function leerQRDesdeImagen(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const preview = document.getElementById('previewQR');
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = 'block';
-
-  setStatus('scanning','Leyendo QR de la imagen…');
-  try {
-    const qrReader = new Html5Qrcode("panel-qr-imagen");
-    const resultado = await qrReader.scanFile(file, false);
-    onQRLeido(resultado);
-  } catch {
-    setStatus('warn','No se encontró QR en la imagen');
-    mostrarToast('warn','⚠ No hay QR legible — prueba con OCR');
-  }
-}
-
-// ══════════════════════════════════════════════
-// CALLBACK CUANDO SE LEE UN QR (ambos modos QR)
-// ══════════════════════════════════════════════
 function onQRLeido(texto) {
-  if (scannerActivo) detenerEscaner();
-
-  const partes = texto.split('|');
-  fuenteActual = 'qr';
-
+  detenerEscaner();
+  const partes = texto.split('|'); fuenteActual = 'qr';
   if (partes.length >= 6) {
-    // QR estándar SUNAT: RUC|TipoDoc|Serie|Numero|IGV|Total|Fecha|...
-    const [rucEmisor, tipoDoc, serie, numero, igv, total, fecha] = partes;
-
-    llenarCampo('rucEmisor', rucEmisor.trim(), 'qr');
-    llenarCampo('serie',     serie.trim(),     'qr');
-    llenarCampo('numero',    numero.trim(),    'qr');
-    llenarCampo('igv',       parseFloat(igv)  || 0, 'qr');
-    llenarCampo('total',     parseFloat(total) || 0, 'qr');
-
+    const [ruc, tipo, serie, num, igv, total, fecha] = partes;
+    llenarCampo('rucEmisor', ruc.trim(), 'qr'); llenarCampo('serie', serie.trim(), 'qr');
+    llenarCampo('numero', num.trim(), 'qr'); llenarCampo('igv', parseFloat(igv)||0, 'qr'); llenarCampo('total', parseFloat(total)||0, 'qr');
     if (fecha) {
-      const partesFecha = fecha.trim().split('/');
-      if (partesFecha.length === 3) {
-        const [d,m,y] = partesFecha;
-        document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-        document.getElementById('fecha').classList.add('filled');
-      }
+      const [d,m,y] = fecha.trim().split('/');
+      if (y) { document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; document.getElementById('fecha').classList.add('filled'); }
     }
-
-    const selectTipo = document.getElementById('tipo');
-    const codTipo = tipoDoc.trim().padStart(2,'0');
-    const opcion  = [...selectTipo.options].find(o => o.value === codTipo);
-    if (opcion) selectTipo.value = opcion.value;
-
-    setStatus('ok','✓ QR leído — datos perfectos');
-    setFuenteTag('✅ Fuente: QR SUNAT (100% exacto)');
-    mostrarToast('ok','✅ Comprobante leído por QR');
+    document.getElementById('tipo').value = tipo.trim().padStart(2,'0');
+    setStatus('ok','✓ QR extraído'); mostrarToast('ok','✅ QR leído con éxito');
   } else {
-    document.getElementById('descripcion').value = texto;
-    setStatus('warn','QR leído pero no es formato SUNAT');
-    mostrarToast('warn','⚠ QR no estándar — completa los campos');
+    mostrarToast('warn','⚠ QR no estándar');
   }
 }
 
-// ══════════════════════════════════════════════
-// MODO 3: OCR CON TESSERACT — IMAGEN O PDF
-// ══════════════════════════════════════════════
-async function procesarConOCR(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
+// ── PROCESADOR NATIVO PDF Y OCR ──
+async function procesarArchivo(event) {
+  const file = event.target.files[0]; if (!file) return;
   const esPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-  // Resetear UI
-  document.getElementById('previewOCR').style.display     = 'none';
-  document.getElementById('pdfPreviewWrap').style.display = 'none';
-  document.getElementById('ocrAlert').style.display       = 'none';
-
-  const progress = document.getElementById('ocrProgress');
-  const bar      = document.getElementById('ocrBar');
-  const label    = document.getElementById('ocrLabel');
-  const alertEl  = document.getElementById('ocrAlert');
-
-  progress.style.display = 'block';
-  bar.style.width        = '5%';
-  label.textContent      = esPDF ? 'Cargando PDF…' : 'Preparando imagen…';
+  
+  const ui = {
+    prog: document.getElementById('ocrProgress'), bar: document.getElementById('ocrBar'),
+    lbl: document.getElementById('ocrLabel'), alert: document.getElementById('ocrAlert'),
+    wrap: document.getElementById('pdfPreviewWrap'), img: document.getElementById('previewOCR')
+  };
+  
+  ui.wrap.style.display = 'none'; ui.img.style.display = 'none'; ui.alert.style.display = 'none';
+  ui.prog.style.display = 'block'; ui.bar.style.width = '10%'; ui.lbl.textContent = 'Analizando archivo...';
   fuenteActual = 'ocr';
+  
+  let textoExtraido = '';
 
   try {
-    let textoTotal = '';
-
     if (esPDF) {
-      // ── Paso 1: Verificar que PDF.js esté disponible ──
-      if (typeof pdfjsLib === 'undefined') {
-        throw new Error('PDF.js no cargó correctamente. Recarga la página e intenta de nuevo.');
-      }
-
-      // Asegurar workerSrc (ya se setea al cargar, pero por si acaso)
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      setStatus('ocr', 'Leyendo PDF…');
-
-      // ── Paso 2: Leer el PDF como ArrayBuffer ──
+      setStatus('ocr', 'Extrayendo PDF nativo...');
       const arrayBuffer = await file.arrayBuffer();
-      bar.style.width   = '15%';
-      label.textContent = 'Analizando estructura del PDF…';
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      ui.bar.style.width = '30%';
+      
+      // Intentar extraer texto digital directamente (100% preciso, súper rápido)
+      let tieneTextoDigital = false;
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(s => s.str).join(' ');
+        if (pageText.length > 100) { tieneTextoDigital = true; textoExtraido += pageText + '\n'; }
+        
+        if (i === 1) { // Mostrar preview
+            const canvas = document.getElementById('pdfCanvas'); const ctx = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: 1.5 });
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            ui.wrap.style.display = 'block';
+        }
+      }
 
-      // ── Paso 3: Cargar el documento PDF ──
-      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-      const pdfDoc      = await loadingTask.promise;
-      const totalPags   = pdfDoc.numPages;
-
-      bar.style.width   = '20%';
-      document.getElementById('pdfPaginas').textContent =
-        `${totalPags} página${totalPags > 1 ? 's' : ''} — procesando todas`;
-      document.getElementById('pdfPreviewWrap').style.display = 'block';
-
-      // ── Paso 4: Renderizar cada página en canvas ──
-      const canvas  = document.getElementById('pdfCanvas');
-      const ctx     = canvas.getContext('2d');
-      const blobs   = [];
-
-      for (let p = 1; p <= totalPags; p++) {
-        const pct = 20 + Math.round((p / totalPags) * 30);
-        bar.style.width   = pct + '%';
-        label.textContent = `Renderizando página ${p} de ${totalPags}…`;
-
-        const page     = await pdfDoc.getPage(p);
-        const viewport = page.getViewport({ scale: 2.5 }); // Alta resolución para mejor OCR
-        canvas.width   = viewport.width;
-        canvas.height  = viewport.height;
-
+      // Si el PDF no tenía texto (es una foto escaneada), usamos Tesseract OCR como respaldo
+      if (!tieneTextoDigital) {
+        setStatus('ocr', 'PDF escaneado. Aplicando OCR...');
+        ui.lbl.textContent = 'Aplicando reconocimiento visual (puede demorar)...';
+        const page = await pdfDoc.getPage(1);
+        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+        const viewport = page.getViewport({ scale: 2.0 }); // Escala alta para precisión
+        canvas.width = viewport.width; canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
-
-        if (p === 1) {
-          canvas.style.display = 'block'; // Mostrar preview de página 1
-        }
-
-        // Canvas → Blob PNG para Tesseract
-        const blob = await new Promise((res, rej) => {
-          canvas.toBlob(b => b ? res(b) : rej(new Error('Canvas vacío')), 'image/png');
-        });
-        blobs.push(blob);
+        
+        textoExtraido = await correrTesseract(canvas, ui.bar, ui.lbl);
       }
-
-      // ── Paso 5: OCR sobre cada página ──
-      setStatus('ocr', `Extrayendo texto (${totalPags} pág.)…`);
-      const worker = await Tesseract.createWorker('spa', 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            const base = 50;
-            const pct  = base + Math.round(m.progress * 45);
-            bar.style.width   = pct + '%';
-            label.textContent = `OCR página… ${pct}%`;
-          }
-        }
-      });
-
-      for (let i = 0; i < blobs.length; i++) {
-        label.textContent = `OCR página ${i+1} de ${blobs.length}…`;
-        const { data: { text } } = await worker.recognize(blobs[i]);
-        textoTotal += '\n' + text;
-      }
-      await worker.terminate();
-
     } else {
-      // ── Imagen normal (JPG, PNG, etc.) ──
-      setStatus('ocr', 'Procesando imagen con OCR…');
-      const preview = document.getElementById('previewOCR');
-      preview.src   = URL.createObjectURL(file);
-      preview.style.display = 'block';
-
-      const worker = await Tesseract.createWorker('spa', 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            const pct = Math.round(m.progress * 100);
-            bar.style.width   = pct + '%';
-            label.textContent = `Reconociendo texto… ${pct}%`;
-          }
-        }
-      });
-
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-      textoTotal = text;
+      // Es una imagen directa
+      ui.img.src = URL.createObjectURL(file); ui.img.style.display = 'block';
+      setStatus('ocr', 'Procesando imagen OCR...');
+      textoExtraido = await correrTesseract(file, ui.bar, ui.lbl);
     }
 
-    // ── Paso final: Extraer campos del texto ──
-    bar.style.width   = '100%';
-    label.textContent = '✓ Texto extraído — llenando campos…';
-
-    extraerDatosOCR(textoTotal);
-
-    setStatus('warn', 'OCR completado — revisa los campos antes de guardar');
-    setFuenteTag('⚠ Fuente: OCR (verifica datos)');
-    alertEl.style.display = 'block';
-    mostrarToast('warn', `⚠ OCR listo — revisa cada campo`);
-    setTimeout(() => { progress.style.display = 'none'; }, 2000);
+    ui.bar.style.width = '100%'; ui.lbl.textContent = 'Extracción completada. Evaluando datos...';
+    extraerDatosInteligente(textoExtraido);
+    
+    setStatus('warn', 'Revisar datos extraídos'); ui.alert.style.display = 'block';
+    mostrarToast('ok', '✅ Extracción finalizada');
+    setTimeout(() => ui.prog.style.display = 'none', 1500);
 
   } catch (err) {
-    console.error('Error OCR:', err);
-    setStatus('error', 'Error al procesar archivo');
-    bar.style.width   = '100%';
-    bar.style.background = 'var(--error)';
-    label.textContent = '❌ ' + (err.message || 'No se pudo procesar. Intenta con otra imagen.');
-    mostrarToast('err', '❌ ' + (err.message || 'Error al procesar archivo'));
-    setTimeout(() => {
-      progress.style.display = 'none';
-      bar.style.background   = 'var(--accent)';
-    }, 4000);
+    setStatus('error', 'Error en extracción'); ui.bar.style.background = 'var(--error)';
+    ui.lbl.textContent = '❌ Error procesando el documento.';
+    mostrarToast('err', '❌ Ocurrió un error al leer el archivo.');
   }
 }
 
-// ── Extrae datos del texto OCR con expresiones regulares ──
-function extraerDatosOCR(texto) {
-  const t = texto.toUpperCase();
-  console.log('=== TEXTO OCR COMPLETO ===\n', texto); // debug: ver qué leyó Tesseract
-
-  // ── RUC del emisor ──
-  // Cubre: "RUC: 10266975738", "RUC 20557351583", o simplemente 11 dígitos solos
-  const rucPatterns = [
-    /RUC[:\s#]+(\d{11})/i,
-    /\b(10\d{9}|20\d{9})\b/
-  ];
-  for (const pat of rucPatterns) {
-    const m = texto.match(pat);
-    if (m) { llenarCampo('rucEmisor', m[1] || m[0], 'ocr'); break; }
-  }
-
-  // ── Serie y Número ──
-  // Cubre: "E001-2569", "F001-00001234", "B001 - 12345", "E001—2569"
-  const serieMatch = texto.match(/\b([FBECT]\d{3})\s*[-–—]\s*(\d{1,8})\b/i);
-  if (serieMatch) {
-    llenarCampo('serie',  serieMatch[1].toUpperCase(), 'ocr');
-    llenarCampo('numero', serieMatch[2].padStart(8,'0'), 'ocr');
-  }
-
-  // ── Tipo de comprobante ──
-  if      (t.match(/FACTURA\s*(ELECTR[OÓ]NICA)?/))          document.getElementById('tipo').value = '01';
-  else if (t.match(/BOLETA\s*(DE\s*VENTA)?/))                document.getElementById('tipo').value = '03';
-  else if (t.match(/NOTA\s*DE\s*CR[EÉ]DITO/))               document.getElementById('tipo').value = '07';
-  else if (t.match(/NOTA\s*DE\s*D[EÉ]BITO/))                document.getElementById('tipo').value = '08';
-  else if (t.match(/RECIBO\s*(POR\s*HONORARIOS)?/))          document.getElementById('tipo').value = '01';
-  else if (t.match(/TICKET|RECIBO/))                         document.getElementById('tipo').value = '03';
-
-  // ── Fecha de emisión ──
-  // Cubre: "01/06/2025", "01-06-2025", "Fecha de Emisión 01/06/2025"
-  const fechaPatterns = [
-    /(?:fecha\s*(?:de\s*)?emisi[oó]n\s*[:\s])\s*(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/i,
-    /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/
-  ];
-  for (const pat of fechaPatterns) {
-    const m = texto.match(pat);
-    if (m) {
-      const d = m[1].padStart(2,'0'), mes = m[2].padStart(2,'0'), y = m[3];
-      // Validar que sea una fecha plausible
-      if (parseInt(mes) <= 12 && parseInt(d) <= 31) {
-        document.getElementById('fecha').value = `${y}-${mes}-${d}`;
-        document.getElementById('fecha').classList.add('ocr-filled');
-        break;
+async function correrTesseract(imagen, barElement, labelElement) {
+  const worker = await Tesseract.createWorker('spa', 1, {
+    logger: m => {
+      if (m.status === 'recognizing text') {
+        const pct = Math.round(m.progress * 100);
+        barElement.style.width = pct + '%'; labelElement.textContent = `OCR: ${pct}%`;
       }
     }
+  });
+  const { data: { text } } = await worker.recognize(imagen);
+  await worker.terminate();
+  return text;
+}
+
+// ── LÓGICA DE EXTRACCIÓN (REGEX MEJORADO SUNAT) ──
+function extraerDatosInteligente(texto) {
+  const t = texto.toUpperCase().replace(/\s+/g, ' '); // Normalizar espacios
+  console.log("Texto Crudo:", t);
+
+  // 1. RUC Emisor y Cliente
+  // Asumimos que el primer RUC encontrado suele ser el del Emisor.
+  const rucs = [...t.matchAll(/(?:RUC|R\.U\.C)[^\d]*(\d{11})/g)].map(m => m[1]);
+  if (rucs.length >= 1) llenarCampo('rucEmisor', rucs[0], 'ocr');
+  if (rucs.length >= 2) llenarCampo('rucCliente', rucs[1], 'ocr');
+
+  // 2. Serie y Número
+  const serieMatch = t.match(/\b([FB]\d{3})\s*[-–]\s*(\d{1,8})\b/);
+  if (serieMatch) {
+    llenarCampo('serie', serieMatch[1], 'ocr');
+    llenarCampo('numero', serieMatch[2].padStart(8,'0'), 'ocr');
+    if (serieMatch[1].startsWith('F')) document.getElementById('tipo').value = '01';
+    if (serieMatch[1].startsWith('B')) document.getElementById('tipo').value = '03';
   }
 
-  // ── IGV ──
-  // Cubre: "IGV S/2.95", "IGV: S/.2.95", "IGV 2.95"
-  const igvMatch = texto.match(/IGV\s*[:\s]*(?:S\/\.?\s*)?([\d,]+\.\d{2})/i);
-  if (igvMatch) llenarCampo('igv', parseMonto(igvMatch[1]), 'ocr');
-
-  // ── Total / Importe Total ──
-  // Cubre: "Importe Total S/31.00", "TOTAL S/ 31.00", "Total: S/31.00"
-  const totalPatterns = [
-    /importe\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
-    /(?:^|\n)\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/im,
-    /monto\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
-    /precio\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
-  ];
-  let totalEncontrado = false;
-  for (const pat of totalPatterns) {
-    const m = texto.match(pat);
-    if (m) { llenarCampo('total', parseMonto(m[1]), 'ocr'); totalEncontrado = true; break; }
+  // 3. Fecha
+  const fechaMatch = t.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+  if (fechaMatch) {
+    document.getElementById('fecha').value = `${fechaMatch[3]}-${fechaMatch[2]}-${fechaMatch[1]}`;
+    document.getElementById('fecha').classList.add('ocr-filled');
   }
 
-  // Si aún no encontró total: toma el mayor monto S/XX.XX del documento
-  if (!totalEncontrado) {
-    const montos = [...texto.matchAll(/S\/\.?\s*([\d,]+\.\d{2})/gi)]
-      .map(m => parseMonto(m[1])).filter(n => n > 0);
-    if (montos.length) llenarCampo('total', Math.max(...montos), 'ocr');
-  }
+  // 4. Moneda
+  if (t.includes('DOLARES') || t.includes('USD')) document.getElementById('moneda').value = 'USD';
+  else document.getElementById('moneda').value = 'PEN';
 
-  // ── Descripción: nombre del emisor (primera línea larga) ──
+  // 5. Montos (Gravada, IGV, Total)
+  const extraerMonto = (regex) => {
+    const match = t.match(regex);
+    return match ? parseFloat(match[1].replace(/,/g, '')) : 0;
+  };
+  
+  const subtotal = extraerMonto(/(?:GRAVADA|SUBTOTAL|VALOR DE VENTA)[^\d]*(\d+[\.,]\d{2})/);
+  const igv = extraerMonto(/IGV[^\d]*(\d+[\.,]\d{2})/);
+  const total = extraerMonto(/(?:IMPORTE TOTAL|TOTAL A PAGAR|TOTAL)[^\d]*(\d+[\.,]\d{2})/);
+
+  if (subtotal) llenarCampo('subtotal', subtotal, 'ocr');
+  if (igv) llenarCampo('igv', igv, 'ocr');
+  if (total) llenarCampo('total', total, 'ocr');
+
+  // 6. Razón Social (Aproximaciones)
+  const señorMatch = t.match(/(?:SEÑOR(?:ES)?|CLIENTE|RAZON SOCIAL)[^\:]*\:\s*([A-Z0-9\.\s&]+?)(?:\sRUC|\sDNI|\sDIRECCI|\sFECHA)/);
+  if (señorMatch) llenarCampo('razonSocialCliente', señorMatch[1].trim(), 'ocr');
+
   const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 5);
-  const nombreEmisor = lineas.find(l =>
-    l.length > 8 && !l.match(/^\d/) && !l.match(/RUC|SUNAT|FACTURA|BOLETA/i)
-  );
-  if (nombreEmisor && !document.getElementById('descripcion').value) {
-    document.getElementById('descripcion').value = nombreEmisor.substring(0, 80);
+  if (lineas.length > 0 && !document.getElementById('razonSocialEmisor').value) {
+    // Usualmente la primera o segunda línea es el nombre del emisor
+    llenarCampo('razonSocialEmisor', lineas[0].substring(0,60), 'ocr'); 
   }
+
+  // 7. Forma de pago
+  if (t.includes('CONTADO')) document.getElementById('formaPago').value = 'Contado';
+  if (t.includes('CREDITO') || t.includes('CUOTAS')) document.getElementById('formaPago').value = 'Credito';
 }
 
-function parseMonto(str) {
-  return parseFloat(String(str).replace(/,/g,'')) || 0;
+function llenarCampo(id, valor, fuente) {
+  const el = document.getElementById(id); if (!el) return;
+  el.value = valor; el.classList.remove('filled','ocr-filled');
+  if (valor !== '' && valor !== 0) el.classList.add(fuente === 'ocr' ? 'ocr-filled' : 'filled');
 }
 
-// ══════════════════════════════════════════════
-// GUARDAR COMPROBANTE
-// ══════════════════════════════════════════════
+// ── GUARDAR Y LISTAR ──
 async function guardarComprobante() {
-  const tipo   = document.getElementById('tipo').value;
-  const fecha  = document.getElementById('fecha').value;
-  const serie  = document.getElementById('serie').value.trim().toUpperCase();
-  const numero = document.getElementById('numero').value.trim();
-  const ruc    = document.getElementById('rucEmisor').value.trim();
-  const igv    = parseFloat(document.getElementById('igv').value)    || 0;
-  const total  = parseFloat(document.getElementById('total').value)  || 0;
-  const desc   = document.getElementById('descripcion').value.trim();
-
-  if (!tipo || !fecha || !serie || !numero) {
-    mostrarToast('warn','⚠ Completa tipo, fecha, serie y número');
-    return;
-  }
-  if (ruc && (ruc.length !== 11 || !/^\d+$/.test(ruc))) {
-    mostrarToast('warn','⚠ El RUC debe tener exactamente 11 dígitos');
-    return;
-  }
-
-  const comprobante = {
-    tipo, fecha, serie, numero,
-    rucEmisor: ruc, igv, total, descripcion: desc,
-    fuente: fuenteActual,
-    guardadoEn: new Date().toISOString()
+  const comp = {
+    tipo: document.getElementById('tipo').value, fecha: document.getElementById('fecha').value,
+    serie: document.getElementById('serie').value.trim().toUpperCase(), numero: document.getElementById('numero').value.trim(),
+    rucEmisor: document.getElementById('rucEmisor').value.trim(), razonSocialEmisor: document.getElementById('razonSocialEmisor').value.trim(),
+    rucCliente: document.getElementById('rucCliente').value.trim(), razonSocialCliente: document.getElementById('razonSocialCliente').value.trim(),
+    moneda: document.getElementById('moneda').value, subtotal: parseFloat(document.getElementById('subtotal').value)||0,
+    igv: parseFloat(document.getElementById('igv').value)||0, total: parseFloat(document.getElementById('total').value)||0,
+    formaPago: document.getElementById('formaPago').value, descripcion: document.getElementById('descripcion').value.trim(),
+    fuente: fuenteActual
   };
 
-  // Guardar en localStorage como respaldo siempre
-  registros.push(comprobante);
+  if (!comp.tipo || !comp.fecha || !comp.serie || !comp.numero) { mostrarToast('warn','⚠ Completa tipo, fecha, serie y número'); return; }
+
+  registros.push(comp);
   localStorage.setItem('comprobantes', JSON.stringify(registros));
 
-  // Enviar a Google Sheets si está configurado
-  if (URL_APPS_SCRIPT && URL_APPS_SCRIPT !== "PEGA_AQUI_TU_URL_DE_GOOGLE_APPS_SCRIPT") {
-    const btn = document.getElementById('btnGuardar');
-    btn.disabled = true;
-    btn.textContent = '⏳ Guardando…';
+  if (URL_APPS_SCRIPT && URL_APPS_SCRIPT.includes("script.google.com")) {
+    document.getElementById('btnGuardar').disabled = true;
     try {
-      await fetch(URL_APPS_SCRIPT, {
-        method:'POST', mode:'no-cors',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(comprobante)
-      });
-      mostrarToast('ok','✅ Guardado en Google Sheets');
-    } catch {
-      mostrarToast('warn','⚠ Sin conexión — guardado localmente');
-    }
-    btn.disabled = false;
-    btn.innerHTML = '💾 Guardar comprobante';
-  } else {
-    mostrarToast('ok','✅ Guardado localmente');
-  }
+      await fetch(URL_APPS_SCRIPT, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify(comp) });
+      mostrarToast('ok','✅ Guardado en Sheet');
+    } catch { mostrarToast('warn','⚠ Guardado solo local'); }
+    document.getElementById('btnGuardar').disabled = false;
+  } else { mostrarToast('ok','✅ Guardado local'); }
 
-  renderizarTabla();
-  actualizarStats();
-  limpiarFormulario();
+  renderizarTabla(); limpiarFormulario();
 }
-
-// ══════════════════════════════════════════════
-// RENDER TABLA
-// ══════════════════════════════════════════════
-const TIPOS = {'01':'Factura','03':'Boleta','07':'N.Crédito','08':'N.Débito','XX':'Otro'};
 
 function renderizarTabla() {
   const tbody = document.getElementById('tablaRegistros');
-  if (!registros.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = [...registros].reverse().map((r, i) => {
-    const idx = registros.length - 1 - i;
-    const badgeClass = `badge-${r.tipo||'01'}`;
-    const tipoLabel  = TIPOS[r.tipo] || r.tipo;
-    const fechaFmt   = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
-    const fuenteBadge = r.fuente === 'qr'  ? '<span class="badge" style="background:#14532d;color:#86efac">QR</span>' :
-                        r.fuente === 'ocr' ? '<span class="badge badge-ocr">OCR</span>' :
-                                             '<span class="badge" style="background:#1e2030;color:var(--muted)">Manual</span>';
-    return `
-      <tr>
-        <td><span class="badge ${badgeClass}">${tipoLabel}</span></td>
-        <td>${fechaFmt}</td>
-        <td class="mono-field">${r.serie}-${r.numero}</td>
-        <td class="mono-field" style="color:var(--muted);font-size:0.75rem">${r.rucEmisor||'—'}</td>
-        <td class="total-cell">S/ ${(r.igv||0).toFixed(2)}</td>
-        <td class="total-cell">S/ ${(r.total||0).toFixed(2)}</td>
-        <td>${fuenteBadge}</td>
-        <td><button class="btn btn-danger" onclick="eliminarRegistro(${idx})" style="padding:4px 10px;font-size:0.72rem">✕</button></td>
-      </tr>`;
-  }).join('');
+  if (!registros.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">Sin comprobantes.</div></td></tr>`; return; }
+  tbody.innerHTML = [...registros].reverse().map((r, i) => `
+    <tr>
+      <td><span class="badge badge-${r.tipo||'01'}">${r.tipo||'--'}</span></td>
+      <td class="mono-field">${r.serie}-${r.numero}</td>
+      <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis;">${r.razonSocialEmisor||r.rucEmisor}</td>
+      <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis;">${r.razonSocialCliente||r.rucCliente}</td>
+      <td>${r.moneda}</td>
+      <td class="mono-field">${(r.total||0).toFixed(2)}</td>
+      <td>${r.fuente}</td>
+      <td><button class="btn btn-danger" onclick="eliminarRegistro(${registros.length-1-i})" style="padding:4px 8px;font-size:0.7rem">✕</button></td>
+    </tr>`).join('');
 }
 
 function eliminarRegistro(idx) {
-  if (!confirm('¿Eliminar este registro?')) return;
-  registros.splice(idx, 1);
-  localStorage.setItem('comprobantes', JSON.stringify(registros));
-  renderizarTabla();
-  actualizarStats();
-}
-
-// ══════════════════════════════════════════════
-// STATS & CSV
-// ══════════════════════════════════════════════
-function actualizarStats() {
-  const tot = registros.reduce((a,r)=>a+(r.total||0),0);
-  const igv = registros.reduce((a,r)=>a+(r.igv||0),0);
-  document.getElementById('statTotal').textContent = `S/ ${tot.toFixed(2)}`;
-  document.getElementById('statIgv').textContent   = `S/ ${igv.toFixed(2)}`;
-  document.getElementById('statCount').textContent = registros.length;
-}
-
-function exportarCSV() {
-  if (!registros.length) { mostrarToast('warn','⚠ No hay registros'); return; }
-  const cols = ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion','fuente'];
-  const rows = [cols.join(','), ...registros.map(r=>cols.map(c=>`"${r[c]??''}"`).join(','))];
-  const blob = new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'),{href:url, download:`comprobantes_${new Date().toISOString().slice(0,10)}.csv`});
-  a.click(); URL.revokeObjectURL(url);
-  mostrarToast('ok','✅ CSV descargado');
-}
-
-// ══════════════════════════════════════════════
-// UTILIDADES
-// ══════════════════════════════════════════════
-function llenarCampo(id, valor, fuente) {
-  const el = document.getElementById(id);
-  el.value = valor;
-  el.classList.remove('filled','ocr-filled');
-  if (valor !== '' && valor !== 0) {
-    el.classList.add(fuente === 'ocr' ? 'ocr-filled' : 'filled');
-  }
+  if(!confirm('¿Borrar?')) return;
+  registros.splice(idx,1); localStorage.setItem('comprobantes', JSON.stringify(registros)); renderizarTabla();
 }
 
 function limpiarFormulario() {
-  ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el.tagName === 'SELECT') el.value = '';
-    else el.value = '';
-    el.classList.remove('filled','ocr-filled');
+  ['tipo','fecha','serie','numero','rucEmisor','razonSocialEmisor','rucCliente','razonSocialCliente','moneda','subtotal','igv','total','formaPago','descripcion'].forEach(id => {
+    document.getElementById(id).value = id === 'moneda' ? 'PEN' : '';
+    document.getElementById(id).classList.remove('filled','ocr-filled');
   });
-  document.getElementById('ocrAlert').style.display        = 'none';
-  document.getElementById('previewOCR').style.display      = 'none';
-  document.getElementById('previewQR').style.display       = 'none';
-  document.getElementById('pdfPreviewWrap').style.display  = 'none';
-  setFuenteTag('');
-  fuenteActual = 'manual';
-  setStatus('idle','Listo');
+  document.getElementById('pdfPreviewWrap').style.display = 'none'; document.getElementById('previewOCR').style.display = 'none'; document.getElementById('ocrAlert').style.display = 'none';
 }
 
-function setStatus(tipo, txt) {
-  const badge = document.getElementById('statusBadge');
-  const dot   = badge.querySelector('.dot');
-  badge.className = 'status status-' + tipo;
-  document.getElementById('statusText').textContent = txt;
-  dot.className = 'dot' + (['scanning','ocr'].includes(tipo) ? ' dot-pulse' : '');
-}
+function setStatus(tipo, txt) { document.getElementById('statusBadge').className = 'status status-'+tipo; document.getElementById('statusText').textContent = txt; }
+let toastTimer; function mostrarToast(tipo, msg) { const t=document.getElementById('toast'); t.className='t-'+tipo; document.getElementById('toastMsg').textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3800); }
 
-function setFuenteTag(txt) {
-  document.getElementById('fuenteTag').textContent = txt;
-}
-
-let toastTimer;
-function mostrarToast(tipo, msg) {
-  const t = document.getElementById('toast');
-  t.className = 't-' + tipo;
-  document.getElementById('toastMsg').textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 3800);
-}
-
-// ── Inicio ──
 renderizarTabla();
-actualizarStats();
 </script>
 </body>
 </html>

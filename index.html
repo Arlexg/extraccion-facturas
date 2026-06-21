@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Comprobantes SUNAT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --border:    #2a2d3e;
+    --accent:    #4f8ef7;
+    --accent-dim:#1e3a6e;
+    --success:   #22c55e;
+    --warn:      #f59e0b;
+    --error:     #ef4444;
+    --text:      #e8eaf0;
+    --muted:     #7c8099;
+    --label:     #a0a8c0;
+    --radius:    10px;
+    --font:      'Inter', sans-serif;
+    --mono:      'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  /* ─── Header ─── */
+  header {
+    max-width: 680px;
+    margin: 0 auto 32px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 42px; height: 42px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: grid; place-items: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+  header p  { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+  /* ─── Layout ─── */
+  .container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ─── Card ─── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 0.88rem;
+  }
+  .card-header .step {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-dim); color: var(--accent);
+    font-size: 0.7rem; font-weight: 700;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .card-body { padding: 20px; }
+
+  /* ─── Scanner ─── */
+  #reader {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    min-height: 200px;
+  }
+  #reader video { border-radius: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    border: none; border-radius: 8px;
+    font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost   { background: var(--border); color: var(--label); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-danger  { background: var(--error); color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .scanner-controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+  /* ─── Status badge ─── */
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px;
+    font-size: 0.78rem; font-weight: 600;
+    margin-top: 12px;
+  }
+  .status-idle    { background: #1e2030; color: var(--muted); }
+  .status-scanning{ background: #1e3a6e; color: var(--accent); }
+  .status-ok      { background: #14532d; color: var(--success); }
+  .status-warn    { background: #451a03; color: var(--warn); }
+  .status-error   { background: #450a0a; color: var(--error); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot-pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ─── Form ─── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 0.75rem; color: var(--label); margin-bottom: 5px; font-weight: 500; }
+  input, select {
+    width: 100%; padding: 9px 12px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text);
+    font-family: var(--font); font-size: 0.85rem;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input.filled { border-color: var(--success); background: #0d1f17; }
+  input[readonly] { color: var(--muted); }
+
+  .mono-field { font-family: var(--mono); letter-spacing: 0.04em; }
+
+  /* ─── Tabla de registros ─── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  thead th {
+    text-align: left; padding: 10px 12px;
+    color: var(--muted); font-weight: 600; font-size: 0.73rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid #1e2030; transition: background .1s; }
+  tbody tr:hover { background: #1e2030; }
+  tbody td { padding: 10px 12px; }
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.72rem; font-weight: 600;
+    font-family: var(--mono);
+  }
+  .badge-01 { background: #1a2e5a; color: #93c5fd; }
+  .badge-03 { background: #2a1a1a; color: #fca5a5; }
+  .badge-07 { background: #1a2a1a; color: #86efac; }
+
+  .total-cell { font-family: var(--mono); font-weight: 600; color: var(--text); }
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--muted); font-size: 0.85rem;
+  }
+  .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+  /* ─── Resumen ─── */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stat {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+    text-align: center;
+  }
+  .stat .val { font-size: 1.4rem; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .stat .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+  /* ─── Toast ─── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px;
+    font-size: 0.85rem; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 999; white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.t-ok   { border-color: var(--success); }
+  #toast.t-warn { border-color: var(--warn); }
+  #toast.t-err  { border-color: var(--error); }
+
+  /* ─── Divider ─── */
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.75rem; margin: 4px 0; }
+  .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  @media (max-width: 480px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🧾</div>
+  <div>
+    <h1>Registro de Comprobantes</h1>
+    <p>Escanea el QR de SUNAT · Datos al instante · Sin errores</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ══ PASO 1: ESCÁNER QR ══ -->
+  <div class="card">
+    <div class="card-header">
+      <span class="step">1</span>
+      Escanear código QR del comprobante
+    </div>
+    <div class="card-body">
+      <div id="reader"></div>
+
+      <div class="scanner-controls">
+        <button class="btn btn-primary" id="btnIniciar" onclick="iniciarEscaner()">
+          <span>📷</span> Iniciar cámara
+        </button>
+        <button class="btn btn-ghost" id="btnDetener" onclick="detenerEscaner()" disabled>
+          <span>⏹</span> Detener
+        </button>
+        <button class="btn btn-ghost" onclick="limpiarFormulario()">
+          <span>🔄</span> Limpiar
+        </button>
+      </div>
+
+      <div id="statusBadge" class="status status-idle">
+        <span class="dot"></span>
+        <span id="statusText">Cámara inactiva</span>
+      </div>
+
+      <div class="divider" style="margin-top:16px">o ingresa datos manualmente</div>
+    </div>
+  </div>
+
+  <!-- ══ PASO 2: FORMULARIO ══ -->
+  <div class="card">
+    <div class="card-header">
+      <span class="step">2</span>
+      Datos del comprobante
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+
+        <div>
+          <label>Tipo de comprobante</label>
+          <select id="tipo">
+            <option value="">— Seleccionar —</option>
+            <option value="01">01 · Factura</option>
+            <option value="03">03 · Boleta de Venta</option>
+            <option value="07">07 · Nota de Crédito</option>
+            <option value="08">08 · Nota de Débito</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Fecha de emisión</label>
+          <input type="date" id="fecha" />
+        </div>
+
+        <div>
+          <label>Serie</label>
+          <input type="text" id="serie" placeholder="F001 / B001" class="mono-field" maxlength="4" />
+        </div>
+
+        <div>
+          <label>Número</label>
+          <input type="text" id="numero" placeholder="00001234" class="mono-field" maxlength="8" />
+        </div>
+
+        <div class="full">
+          <label>RUC del Emisor</label>
+          <input type="text" id="rucEmisor" placeholder="20XXXXXXXXX" class="mono-field" maxlength="11" />
+        </div>
+
+        <div>
+          <label>IGV (S/.)</label>
+          <input type="number" id="igv" placeholder="0.00" step="0.01" min="0" />
+        </div>
+
+        <div>
+          <label>Total (S/.)</label>
+          <input type="number" id="total" placeholder="0.00" step="0.01" min="0" />
+        </div>
+
+        <div class="full">
+          <label>Descripción / Proveedor <span style="color:var(--muted)">(opcional)</span></label>
+          <input type="text" id="descripcion" placeholder="Ej: Factura de servicios - Empresa SAC" />
+        </div>
+
+      </div>
+
+      <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-success" id="btnGuardar" onclick="guardarComprobante()">
+          <span>💾</span> Guardar comprobante
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PASO 3: RESUMEN ══ -->
+  <div class="card">
+    <div class="card-header">
+      <span class="step">3</span>
+      Resumen del mes
+    </div>
+    <div class="card-body">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat"><div class="val" id="statTotal">S/ 0</div><div class="lbl">Total registrado</div></div>
+        <div class="stat"><div class="val" id="statIgv">S/ 0</div><div class="lbl">IGV acumulado</div></div>
+        <div class="stat"><div class="val" id="statCount">0</div><div class="lbl">Comprobantes</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ REGISTROS ══ -->
+  <div class="card">
+    <div class="card-header">
+      📋 Registros guardados
+      <span style="margin-left:auto;">
+        <button class="btn btn-ghost" onclick="exportarCSV()" style="padding:6px 12px; font-size:0.75rem;">
+          ⬇ Exportar CSV
+        </button>
+      </span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Fecha</th>
+            <th>Serie-Número</th>
+            <th>RUC Emisor</th>
+            <th>IGV</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaRegistros">
+          <tr><td colspan="7"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún. Escanea el QR de tu primer comprobante.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast">
+  <span id="toastIcon"></span>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIGURACIÓN  ← Pega aquí tu URL de Apps Script
+// ══════════════════════════════════════════════
+const URL_APPS_SCRIPT = "PEGA_AQUI_TU_URL_DE_GOOGLE_APPS_SCRIPT";
+
+// ══════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════
+let html5QrCode = null;
+let scannerActivo = false;
+let registros = JSON.parse(localStorage.getItem('comprobantes') || '[]');
+
+// ══════════════════════════════════════════════
+// ESCÁNER QR
+// ══════════════════════════════════════════════
+async function iniciarEscaner() {
+  setStatus('scanning', 'Buscando código QR…');
+  document.getElementById('btnIniciar').disabled = true;
+  document.getElementById('btnDetener').disabled = false;
+
+  try {
+    html5QrCode = new Html5Qrcode("reader");
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onQRLeido,
+      () => {}
+    );
+    scannerActivo = true;
+  } catch (err) {
+    setStatus('error', 'No se pudo acceder a la cámara');
+    document.getElementById('btnIniciar').disabled = false;
+    document.getElementById('btnDetener').disabled = true;
+    mostrarToast('error', '❌ Permiso de cámara denegado o no disponible');
+  }
+}
+
+async function detenerEscaner() {
+  if (html5QrCode && scannerActivo) {
+    await html5QrCode.stop();
+    html5QrCode.clear();
+    scannerActivo = false;
+  }
+  setStatus('idle', 'Cámara inactiva');
+  document.getElementById('btnIniciar').disabled = false;
+  document.getElementById('btnDetener').disabled = true;
+}
+
+// ══════════════════════════════════════════════
+// PROCESAMIENTO DEL QR DE SUNAT
+// Formato estándar: RUC|TipoDoc|Serie|Numero|IGV|Total|Fecha|TipoDoc2|RUCAdquirente|
+// ══════════════════════════════════════════════
+function onQRLeido(texto) {
+  detenerEscaner();
+
+  const partes = texto.split('|');
+
+  if (partes.length >= 6) {
+    // QR de SUNAT válido
+    const [rucEmisor, tipoDoc, serie, numero, igv, total, fecha] = partes;
+
+    llenarCampo('rucEmisor', rucEmisor.trim(), true);
+    llenarCampo('serie',     serie.trim(),     true);
+    llenarCampo('numero',    numero.trim(),    true);
+    llenarCampo('igv',       parseFloat(igv)  || '', true);
+    llenarCampo('total',     parseFloat(total) || '', true);
+
+    // Fecha: SUNAT usa DD/MM/YYYY → la convertimos a YYYY-MM-DD para el input
+    if (fecha) {
+      const [d, m, y] = fecha.trim().split('/');
+      if (d && m && y) {
+        document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        document.getElementById('fecha').classList.add('filled');
+      }
+    }
+
+    // Tipo de comprobante
+    const selectTipo = document.getElementById('tipo');
+    const opcion = [...selectTipo.options].find(o => o.value === tipoDoc.trim().padStart(2,'0'));
+    if (opcion) selectTipo.value = opcion.value;
+
+    setStatus('ok', '✓ QR leído — Revisa y guarda');
+    mostrarToast('ok', '✅ Comprobante leído correctamente');
+  } else {
+    // No es QR de SUNAT — intentamos como texto genérico
+    setStatus('warn', 'QR no es de SUNAT — revisa los campos');
+    mostrarToast('warn', '⚠ QR leído pero no es formato SUNAT');
+    document.getElementById('descripcion').value = texto;
+  }
+}
+
+function llenarCampo(id, valor, filled = false) {
+  const el = document.getElementById(id);
+  el.value = valor;
+  if (filled && valor !== '') el.classList.add('filled');
+}
+
+// ══════════════════════════════════════════════
+// GUARDAR COMPROBANTE
+// ══════════════════════════════════════════════
+async function guardarComprobante() {
+  const tipo   = document.getElementById('tipo').value;
+  const fecha  = document.getElementById('fecha').value;
+  const serie  = document.getElementById('serie').value.trim().toUpperCase();
+  const numero = document.getElementById('numero').value.trim();
+  const ruc    = document.getElementById('rucEmisor').value.trim();
+  const igv    = parseFloat(document.getElementById('igv').value) || 0;
+  const total  = parseFloat(document.getElementById('total').value) || 0;
+  const desc   = document.getElementById('descripcion').value.trim();
+
+  // Validación
+  if (!tipo || !fecha || !serie || !numero || !ruc) {
+    mostrarToast('warn', '⚠ Completa los campos obligatorios');
+    return;
+  }
+  if (ruc.length !== 11 || !/^\d+$/.test(ruc)) {
+    mostrarToast('warn', '⚠ El RUC debe tener 11 dígitos');
+    return;
+  }
+
+  const comprobante = { tipo, fecha, serie, numero, rucEmisor: ruc, igv, total, descripcion: desc, guardadoEn: new Date().toISOString() };
+
+  // 1. Guardar en localStorage como respaldo local
+  registros.push(comprobante);
+  localStorage.setItem('comprobantes', JSON.stringify(registros));
+
+  // 2. Enviar a Google Sheets si está configurado
+  if (URL_APPS_SCRIPT && URL_APPS_SCRIPT !== "PEGA_AQUI_TU_URL_DE_GOOGLE_APPS_SCRIPT") {
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Guardando…';
+    try {
+      await fetch(URL_APPS_SCRIPT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(comprobante)
+      });
+      mostrarToast('ok', '✅ Guardado en la base de datos central');
+    } catch {
+      mostrarToast('warn', '⚠ Sin conexión — guardado solo localmente');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span>💾</span> Guardar comprobante';
+  } else {
+    mostrarToast('ok', '✅ Guardado localmente (configura Apps Script para sincronizar)');
+  }
+
+  renderizarTabla();
+  actualizarStats();
+  limpiarFormulario();
+}
+
+// ══════════════════════════════════════════════
+// RENDER TABLA
+// ══════════════════════════════════════════════
+const TIPOS = { '01':'Factura','03':'Boleta','07':'N.Crédito','08':'N.Débito' };
+
+function renderizarTabla() {
+  const tbody = document.getElementById('tablaRegistros');
+  if (registros.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = [...registros].reverse().map((r, i) => {
+    const idx = registros.length - 1 - i;
+    const badgeClass = `badge-${r.tipo || '01'}`;
+    const tipoLabel  = TIPOS[r.tipo] || r.tipo;
+    const fechaFmt   = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
+    return `
+      <tr>
+        <td><span class="badge ${badgeClass}">${tipoLabel}</span></td>
+        <td>${fechaFmt}</td>
+        <td class="mono-field">${r.serie}-${r.numero}</td>
+        <td class="mono-field" style="color:var(--muted)">${r.rucEmisor}</td>
+        <td class="total-cell">S/ ${r.igv.toFixed(2)}</td>
+        <td class="total-cell">S/ ${r.total.toFixed(2)}</td>
+        <td><button class="btn btn-danger" onclick="eliminarRegistro(${idx})" style="padding:4px 10px;font-size:0.72rem;">✕</button></td>
+      </tr>`;
+  }).join('');
+}
+
+function eliminarRegistro(idx) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  registros.splice(idx, 1);
+  localStorage.setItem('comprobantes', JSON.stringify(registros));
+  renderizarTabla();
+  actualizarStats();
+}
+
+// ══════════════════════════════════════════════
+// ESTADÍSTICAS
+// ══════════════════════════════════════════════
+function actualizarStats() {
+  const totalSum = registros.reduce((a, r) => a + (r.total || 0), 0);
+  const igvSum   = registros.reduce((a, r) => a + (r.igv   || 0), 0);
+  document.getElementById('statTotal').textContent = `S/ ${totalSum.toFixed(2)}`;
+  document.getElementById('statIgv').textContent   = `S/ ${igvSum.toFixed(2)}`;
+  document.getElementById('statCount').textContent = registros.length;
+}
+
+// ══════════════════════════════════════════════
+// EXPORTAR CSV
+// ══════════════════════════════════════════════
+function exportarCSV() {
+  if (registros.length === 0) { mostrarToast('warn', '⚠ No hay registros para exportar'); return; }
+  const cols = ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion'];
+  const rows = [cols.join(','), ...registros.map(r => cols.map(c => `"${r[c] ?? ''}"`).join(','))];
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `comprobantes_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  mostrarToast('ok', '✅ CSV descargado');
+}
+
+// ══════════════════════════════════════════════
+// UTILIDADES
+// ══════════════════════════════════════════════
+function limpiarFormulario() {
+  ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.classList.remove('filled');
+  });
+  setStatus('idle', 'Cámara inactiva');
+}
+
+function setStatus(tipo, txt) {
+  const badge = document.getElementById('statusBadge');
+  const dot   = badge.querySelector('.dot');
+  badge.className = 'status status-' + tipo;
+  document.getElementById('statusText').textContent = txt;
+  dot.className = 'dot' + (tipo === 'scanning' ? ' dot-pulse' : '');
+}
+
+let toastTimer;
+function mostrarToast(tipo, msg) {
+  const t = document.getElementById('toast');
+  t.className = `t-${tipo}`;
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ══════════════════════════════════════════════
+// INICIO
+// ══════════════════════════════════════════════
+renderizarTabla();
+actualizarStats();
+</script>
+</body>
+</html>

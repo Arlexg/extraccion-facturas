@@ -6,7 +6,14 @@
 <title>Registro de Comprobantes SUNAT</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script>
+  // Configurar worker de PDF.js inmediatamente después de cargarlo
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+  }
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -588,9 +595,10 @@ async function procesarConOCR(event) {
 
   const esPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-  // Ocultar previews anteriores
-  document.getElementById('previewOCR').style.display      = 'none';
-  document.getElementById('pdfPreviewWrap').style.display  = 'none';
+  // Resetear UI
+  document.getElementById('previewOCR').style.display     = 'none';
+  document.getElementById('pdfPreviewWrap').style.display = 'none';
+  document.getElementById('ocrAlert').style.display       = 'none';
 
   const progress = document.getElementById('ocrProgress');
   const bar      = document.getElementById('ocrBar');
@@ -598,73 +606,90 @@ async function procesarConOCR(event) {
   const alertEl  = document.getElementById('ocrAlert');
 
   progress.style.display = 'block';
-  alertEl.style.display  = 'none';
-  bar.style.width        = '0%';
+  bar.style.width        = '5%';
+  label.textContent      = esPDF ? 'Cargando PDF…' : 'Preparando imagen…';
   fuenteActual = 'ocr';
 
   try {
     let textoTotal = '';
-    let imagenParaOCR; // ImageData o Blob que se pasa a Tesseract
 
     if (esPDF) {
-      // ── Procesar PDF con PDF.js ──
-      setStatus('ocr', 'Leyendo PDF…');
-      label.textContent = 'Cargando PDF…';
+      // ── Paso 1: Verificar que PDF.js esté disponible ──
+      if (typeof pdfjsLib === 'undefined') {
+        throw new Error('PDF.js no cargó correctamente. Recarga la página e intenta de nuevo.');
+      }
 
+      // Asegurar workerSrc (ya se setea al cargar, pero por si acaso)
       pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+      setStatus('ocr', 'Leyendo PDF…');
+
+      // ── Paso 2: Leer el PDF como ArrayBuffer ──
       const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc      = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      bar.style.width   = '15%';
+      label.textContent = 'Analizando estructura del PDF…';
+
+      // ── Paso 3: Cargar el documento PDF ──
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+      const pdfDoc      = await loadingTask.promise;
       const totalPags   = pdfDoc.numPages;
 
+      bar.style.width   = '20%';
       document.getElementById('pdfPaginas').textContent =
         `${totalPags} página${totalPags > 1 ? 's' : ''} — procesando todas`;
       document.getElementById('pdfPreviewWrap').style.display = 'block';
 
+      // ── Paso 4: Renderizar cada página en canvas ──
       const canvas  = document.getElementById('pdfCanvas');
       const ctx     = canvas.getContext('2d');
-      const allBlobs = [];
+      const blobs   = [];
 
       for (let p = 1; p <= totalPags; p++) {
+        const pct = 20 + Math.round((p / totalPags) * 30);
+        bar.style.width   = pct + '%';
         label.textContent = `Renderizando página ${p} de ${totalPags}…`;
-        bar.style.width   = Math.round((p / totalPags) * 40) + '%';
 
         const page     = await pdfDoc.getPage(p);
-        const viewport = page.getViewport({ scale: 2.5 }); // escala alta = mejor OCR
+        const viewport = page.getViewport({ scale: 2.5 }); // Alta resolución para mejor OCR
         canvas.width   = viewport.width;
         canvas.height  = viewport.height;
+
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // Mostrar preview de la primera página
-        if (p === 1) canvas.style.display = 'block';
+        if (p === 1) {
+          canvas.style.display = 'block'; // Mostrar preview de página 1
+        }
 
-        // Convertir canvas a blob para Tesseract
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-        allBlobs.push(blob);
+        // Canvas → Blob PNG para Tesseract
+        const blob = await new Promise((res, rej) => {
+          canvas.toBlob(b => b ? res(b) : rej(new Error('Canvas vacío')), 'image/png');
+        });
+        blobs.push(blob);
       }
 
-      // OCR sobre cada página y concatenar texto
+      // ── Paso 5: OCR sobre cada página ──
+      setStatus('ocr', `Extrayendo texto (${totalPags} pág.)…`);
       const worker = await Tesseract.createWorker('spa', 1, {
         logger: m => {
           if (m.status === 'recognizing text') {
-            const base = 40;
-            const pct  = base + Math.round(m.progress * (100 - base));
+            const base = 50;
+            const pct  = base + Math.round(m.progress * 45);
             bar.style.width   = pct + '%';
-            label.textContent = `OCR en curso… ${pct}%`;
+            label.textContent = `OCR página… ${pct}%`;
           }
         }
       });
 
-      setStatus('ocr', `OCR del PDF (${totalPags} pág.)…`);
-      for (const blob of allBlobs) {
-        const { data: { text } } = await worker.recognize(blob);
+      for (let i = 0; i < blobs.length; i++) {
+        label.textContent = `OCR página ${i+1} de ${blobs.length}…`;
+        const { data: { text } } = await worker.recognize(blobs[i]);
         textoTotal += '\n' + text;
       }
       await worker.terminate();
 
     } else {
-      // ── Procesar IMAGEN normal ──
+      // ── Imagen normal (JPG, PNG, etc.) ──
       setStatus('ocr', 'Procesando imagen con OCR…');
       const preview = document.getElementById('previewOCR');
       preview.src   = URL.createObjectURL(file);
@@ -685,72 +710,116 @@ async function procesarConOCR(event) {
       textoTotal = text;
     }
 
+    // ── Paso final: Extraer campos del texto ──
     bar.style.width   = '100%';
-    label.textContent = 'Análisis completado ✓';
+    label.textContent = '✓ Texto extraído — llenando campos…';
 
     extraerDatosOCR(textoTotal);
 
-    setStatus('warn', 'OCR completado — revisa los campos');
+    setStatus('warn', 'OCR completado — revisa los campos antes de guardar');
     setFuenteTag('⚠ Fuente: OCR (verifica datos)');
     alertEl.style.display = 'block';
-    mostrarToast('warn', `⚠ OCR listo (${esPDF ? 'PDF' : 'imagen'}) — revisa cada campo`);
-
-    setTimeout(() => { progress.style.display = 'none'; }, 1800);
+    mostrarToast('warn', `⚠ OCR listo — revisa cada campo`);
+    setTimeout(() => { progress.style.display = 'none'; }, 2000);
 
   } catch (err) {
+    console.error('Error OCR:', err);
     setStatus('error', 'Error al procesar archivo');
-    label.textContent = 'Error: ' + (err.message || 'No se pudo leer el archivo');
-    mostrarToast('err','❌ No se pudo procesar la imagen');
+    bar.style.width   = '100%';
+    bar.style.background = 'var(--error)';
+    label.textContent = '❌ ' + (err.message || 'No se pudo procesar. Intenta con otra imagen.');
+    mostrarToast('err', '❌ ' + (err.message || 'Error al procesar archivo'));
+    setTimeout(() => {
+      progress.style.display = 'none';
+      bar.style.background   = 'var(--accent)';
+    }, 4000);
   }
 }
 
 // ── Extrae datos del texto OCR con expresiones regulares ──
 function extraerDatosOCR(texto) {
   const t = texto.toUpperCase();
+  console.log('=== TEXTO OCR COMPLETO ===\n', texto); // debug: ver qué leyó Tesseract
 
-  // RUC: 11 dígitos que empiezan con 10 o 20
-  const rucMatch = texto.match(/\b(10|20)\d{9}\b/);
-  if (rucMatch) llenarCampo('rucEmisor', rucMatch[0], 'ocr');
+  // ── RUC del emisor ──
+  // Cubre: "RUC: 10266975738", "RUC 20557351583", o simplemente 11 dígitos solos
+  const rucPatterns = [
+    /RUC[:\s#]+(\d{11})/i,
+    /\b(10\d{9}|20\d{9})\b/
+  ];
+  for (const pat of rucPatterns) {
+    const m = texto.match(pat);
+    if (m) { llenarCampo('rucEmisor', m[1] || m[0], 'ocr'); break; }
+  }
 
-  // Serie-Número: patrones como F001-00001234, B001-12345678, E001-1
-  const serieMatch = texto.match(/\b([FBEC]\d{3})\s*[-–]\s*(\d{1,8})\b/i);
+  // ── Serie y Número ──
+  // Cubre: "E001-2569", "F001-00001234", "B001 - 12345", "E001—2569"
+  const serieMatch = texto.match(/\b([FBECT]\d{3})\s*[-–—]\s*(\d{1,8})\b/i);
   if (serieMatch) {
     llenarCampo('serie',  serieMatch[1].toUpperCase(), 'ocr');
     llenarCampo('numero', serieMatch[2].padStart(8,'0'), 'ocr');
   }
 
-  // Tipo de comprobante por palabras clave
-  if      (t.includes('FACTURA'))           document.getElementById('tipo').value = '01';
-  else if (t.includes('BOLETA'))            document.getElementById('tipo').value = '03';
-  else if (t.includes('NOTA DE CRÉDITO') ||
-           t.includes('NOTA DE CREDITO'))   document.getElementById('tipo').value = '07';
-  else if (t.includes('NOTA DE DÉBITO') ||
-           t.includes('NOTA DE DEBITO'))    document.getElementById('tipo').value = '08';
+  // ── Tipo de comprobante ──
+  if      (t.match(/FACTURA\s*(ELECTR[OÓ]NICA)?/))          document.getElementById('tipo').value = '01';
+  else if (t.match(/BOLETA\s*(DE\s*VENTA)?/))                document.getElementById('tipo').value = '03';
+  else if (t.match(/NOTA\s*DE\s*CR[EÉ]DITO/))               document.getElementById('tipo').value = '07';
+  else if (t.match(/NOTA\s*DE\s*D[EÉ]BITO/))                document.getElementById('tipo').value = '08';
+  else if (t.match(/RECIBO\s*(POR\s*HONORARIOS)?/))          document.getElementById('tipo').value = '01';
+  else if (t.match(/TICKET|RECIBO/))                         document.getElementById('tipo').value = '03';
 
-  // Fecha: DD/MM/YYYY o DD-MM-YYYY
-  const fechaMatch = texto.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (fechaMatch) {
-    const [,d,m,y] = fechaMatch;
-    document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-    document.getElementById('fecha').classList.add('ocr-filled');
+  // ── Fecha de emisión ──
+  // Cubre: "01/06/2025", "01-06-2025", "Fecha de Emisión 01/06/2025"
+  const fechaPatterns = [
+    /(?:fecha\s*(?:de\s*)?emisi[oó]n\s*[:\s])\s*(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/i,
+    /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/
+  ];
+  for (const pat of fechaPatterns) {
+    const m = texto.match(pat);
+    if (m) {
+      const d = m[1].padStart(2,'0'), mes = m[2].padStart(2,'0'), y = m[3];
+      // Validar que sea una fecha plausible
+      if (parseInt(mes) <= 12 && parseInt(d) <= 31) {
+        document.getElementById('fecha').value = `${y}-${mes}-${d}`;
+        document.getElementById('fecha').classList.add('ocr-filled');
+        break;
+      }
+    }
   }
 
-  // IGV: busca línea con "IGV" seguida de monto
-  const igvMatch = texto.match(/IGV\s*[:\s]\s*S?\/?\.?\s*([\d,]+\.?\d{0,2})/i);
+  // ── IGV ──
+  // Cubre: "IGV S/2.95", "IGV: S/.2.95", "IGV 2.95"
+  const igvMatch = texto.match(/IGV\s*[:\s]*(?:S\/\.?\s*)?([\d,]+\.\d{2})/i);
   if (igvMatch) llenarCampo('igv', parseMonto(igvMatch[1]), 'ocr');
 
-  // Total: busca TOTAL o IMPORTE TOTAL seguido de monto
-  const totalMatch = texto.match(/(?:TOTAL|IMPORTE TOTAL|PRECIO TOTAL)\s*[:\s]\s*S?\/?\.?\s*([\d,]+\.?\d{0,2})/i);
-  if (totalMatch) llenarCampo('total', parseMonto(totalMatch[1]), 'ocr');
+  // ── Total / Importe Total ──
+  // Cubre: "Importe Total S/31.00", "TOTAL S/ 31.00", "Total: S/31.00"
+  const totalPatterns = [
+    /importe\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
+    /(?:^|\n)\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/im,
+    /monto\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
+    /precio\s*total\s*[:\s]*(?:s\/\.?\s*)?([\d,]+\.\d{2})/i,
+  ];
+  let totalEncontrado = false;
+  for (const pat of totalPatterns) {
+    const m = texto.match(pat);
+    if (m) { llenarCampo('total', parseMonto(m[1]), 'ocr'); totalEncontrado = true; break; }
+  }
 
-  // Si no encontró total, busca el número más grande como aproximación
-  if (!totalMatch) {
+  // Si aún no encontró total: toma el mayor monto S/XX.XX del documento
+  if (!totalEncontrado) {
     const montos = [...texto.matchAll(/S\/\.?\s*([\d,]+\.\d{2})/gi)]
       .map(m => parseMonto(m[1])).filter(n => n > 0);
-    if (montos.length) {
-      const maxMonto = Math.max(...montos);
-      llenarCampo('total', maxMonto, 'ocr');
-    }
+    if (montos.length) llenarCampo('total', Math.max(...montos), 'ocr');
+  }
+
+  // ── Descripción: nombre del emisor (primera línea larga) ──
+  const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+  const nombreEmisor = lineas.find(l =>
+    l.length > 8 && !l.match(/^\d/) && !l.match(/RUC|SUNAT|FACTURA|BOLETA/i)
+  );
+  if (nombreEmisor && !document.getElementById('descripcion').value) {
+    document.getElementById('descripcion').value = nombreEmisor.substring(0, 80);
   }
 }
 

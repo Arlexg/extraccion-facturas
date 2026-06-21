@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Registro de Comprobantes SUNAT</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -35,30 +37,24 @@
     padding: 24px 16px 60px;
   }
 
-  /* ─── Header ─── */
   header {
-    max-width: 680px;
-    margin: 0 auto 32px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
+    max-width: 700px;
+    margin: 0 auto 28px;
+    display: flex; align-items: center; gap: 14px;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border);
   }
   .logo {
     width: 42px; height: 42px;
-    background: var(--accent);
-    border-radius: 10px;
+    background: var(--accent); border-radius: 10px;
     display: grid; place-items: center;
     font-size: 20px; flex-shrink: 0;
   }
   header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
   header p  { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
 
-  /* ─── Layout ─── */
-  .container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .container { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
-  /* ─── Card ─── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -79,20 +75,73 @@
   }
   .card-body { padding: 20px; }
 
-  /* ─── Scanner ─── */
-  #reader {
-    width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #000;
-    min-height: 200px;
+  /* ── Tabs de modo escáner ── */
+  .mode-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
   }
-  #reader video { border-radius: 8px; }
+  .mode-tab {
+    flex: 1; padding: 10px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--muted);
+    font-family: var(--font); font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; text-align: center;
+    transition: all .15s;
+  }
+  .mode-tab.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
+  /* ── Paneles de modo ── */
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
+  /* ── Área cámara/imagen ── */
+  #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 180px; }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s;
+    position: relative;
+  }
+  .upload-zone:hover { border-color: var(--accent); }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-zone .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+  .upload-zone p { color: var(--muted); font-size: 0.85rem; }
+  .upload-zone span { color: var(--accent); font-weight: 600; }
+
+  #previewImg {
+    width: 100%; border-radius: 8px; margin-top: 12px;
+    display: none; max-height: 300px; object-fit: contain;
+  }
+
+  /* ── OCR Progress ── */
+  .ocr-progress {
+    margin-top: 12px; display: none;
+  }
+  .ocr-bar-wrap {
+    background: var(--bg); border-radius: 20px; height: 6px; overflow: hidden;
+  }
+  .ocr-bar {
+    height: 100%; background: var(--accent);
+    border-radius: 20px; width: 0%;
+    transition: width .3s ease;
+  }
+  .ocr-label { font-size: 0.75rem; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  /* ── Botones ── */
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 10px 18px;
-    border: none; border-radius: 8px;
+    padding: 10px 18px; border: none; border-radius: 8px;
     font-family: var(--font); font-size: 0.85rem; font-weight: 600;
     cursor: pointer; transition: opacity .15s, transform .1s;
   }
@@ -101,32 +150,39 @@
   .btn-ghost   { background: var(--border); color: var(--label); }
   .btn-success { background: var(--success); color: #fff; }
   .btn-danger  { background: var(--error); color: #fff; }
+  .btn-warn    { background: var(--warn); color: #000; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .scanner-controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 
-  /* ─── Status badge ─── */
+  /* ── Status badge ── */
   .status {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 12px; border-radius: 20px;
-    font-size: 0.78rem; font-weight: 600;
-    margin-top: 12px;
+    font-size: 0.78rem; font-weight: 600; margin-top: 12px;
   }
-  .status-idle    { background: #1e2030; color: var(--muted); }
-  .status-scanning{ background: #1e3a6e; color: var(--accent); }
-  .status-ok      { background: #14532d; color: var(--success); }
-  .status-warn    { background: #451a03; color: var(--warn); }
-  .status-error   { background: #450a0a; color: var(--error); }
+  .status-idle     { background: #1e2030; color: var(--muted); }
+  .status-scanning { background: #1e3a6e; color: var(--accent); }
+  .status-ocr      { background: #2a1f00; color: var(--warn); }
+  .status-ok       { background: #14532d; color: var(--success); }
+  .status-warn     { background: #451a03; color: var(--warn); }
+  .status-error    { background: #450a0a; color: var(--error); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .dot-pulse { animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-  /* ─── Form ─── */
-  .form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+  /* ── Alerta OCR ── */
+  .ocr-alert {
+    display: none;
+    margin-top: 14px;
+    background: #2a1f00; border: 1px solid var(--warn);
+    border-radius: 8px; padding: 12px 14px;
+    font-size: 0.82rem; color: var(--warn); line-height: 1.5;
   }
+  .ocr-alert.show { display: block; }
+
+  /* ── Formulario ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-grid .full { grid-column: 1 / -1; }
   label { display: block; font-size: 0.75rem; color: var(--label); margin-bottom: 5px; font-weight: 500; }
   input, select {
@@ -137,12 +193,11 @@
     transition: border-color .15s;
   }
   input:focus, select:focus { outline: none; border-color: var(--accent); }
-  input.filled { border-color: var(--success); background: #0d1f17; }
-  input[readonly] { color: var(--muted); }
-
+  input.filled  { border-color: var(--success); background: #0d1f17; }
+  input.ocr-filled { border-color: var(--warn); background: #1a1400; }
   .mono-field { font-family: var(--mono); letter-spacing: 0.04em; }
 
-  /* ─── Tabla de registros ─── */
+  /* ── Tabla ── */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
   thead th {
@@ -154,33 +209,28 @@
   tbody tr { border-bottom: 1px solid #1e2030; transition: background .1s; }
   tbody tr:hover { background: #1e2030; }
   tbody td { padding: 10px 12px; }
-  .badge {
-    display: inline-block; padding: 2px 8px;
-    border-radius: 4px; font-size: 0.72rem; font-weight: 600;
-    font-family: var(--mono);
-  }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; font-family: var(--mono); }
   .badge-01 { background: #1a2e5a; color: #93c5fd; }
   .badge-03 { background: #2a1a1a; color: #fca5a5; }
   .badge-07 { background: #1a2a1a; color: #86efac; }
+  .badge-ocr{ background: #2a1f00; color: var(--warn); font-size: 0.65rem; margin-left: 4px; }
 
-  .total-cell { font-family: var(--mono); font-weight: 600; color: var(--text); }
-  .empty-state {
-    text-align: center; padding: 40px 20px;
-    color: var(--muted); font-size: 0.85rem;
-  }
+  .total-cell { font-family: var(--mono); font-weight: 600; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 0.85rem; }
   .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
 
-  /* ─── Resumen ─── */
+  /* ── Stats ── */
   .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .stat {
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 8px; padding: 14px;
-    text-align: center;
-  }
-  .stat .val { font-size: 1.4rem; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; }
+  .stat .val { font-size: 1.4rem; font-weight: 700; font-family: var(--mono); }
   .stat .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
 
-  /* ─── Toast ─── */
+  /* ── Divider ── */
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.75rem; margin: 16px 0 4px; }
+  .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  /* ── Toast ── */
   #toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
     background: var(--surface); border: 1px solid var(--border);
@@ -189,20 +239,17 @@
     display: flex; align-items: center; gap: 10px;
     box-shadow: 0 8px 32px rgba(0,0,0,.5);
     transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-    z-index: 999; white-space: nowrap;
+    z-index: 999;
   }
   #toast.show { transform: translateX(-50%) translateY(0); }
   #toast.t-ok   { border-color: var(--success); }
   #toast.t-warn { border-color: var(--warn); }
   #toast.t-err  { border-color: var(--error); }
 
-  /* ─── Divider ─── */
-  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.75rem; margin: 4px 0; }
-  .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
-
   @media (max-width: 480px) {
     .form-grid { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: 1fr 1fr; }
+    .mode-tab { font-size: 0.75rem; padding: 8px 4px; }
   }
 </style>
 </head>
@@ -211,40 +258,82 @@
 <header>
   <div class="logo">🧾</div>
   <div>
-    <h1>Registro de Comprobantes</h1>
-    <p>Escanea el QR de SUNAT · Datos al instante · Sin errores</p>
+    <h1>Registro de Comprobantes SUNAT</h1>
+    <p>QR instantáneo · OCR para comprobantes sin QR · 100% gratuito</p>
   </div>
 </header>
 
 <div class="container">
 
-  <!-- ══ PASO 1: ESCÁNER QR ══ -->
+  <!-- ══ PASO 1: CAPTURA ══ -->
   <div class="card">
     <div class="card-header">
       <span class="step">1</span>
-      Escanear código QR del comprobante
+      Capturar comprobante
     </div>
     <div class="card-body">
-      <div id="reader"></div>
 
-      <div class="scanner-controls">
-        <button class="btn btn-primary" id="btnIniciar" onclick="iniciarEscaner()">
-          <span>📷</span> Iniciar cámara
-        </button>
-        <button class="btn btn-ghost" id="btnDetener" onclick="detenerEscaner()" disabled>
-          <span>⏹</span> Detener
-        </button>
-        <button class="btn btn-ghost" onclick="limpiarFormulario()">
-          <span>🔄</span> Limpiar
-        </button>
+      <!-- Tabs de modo -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" onclick="cambiarModo('qr-camara')" id="tab-qr-camara">📷 QR con cámara</button>
+        <button class="mode-tab" onclick="cambiarModo('qr-imagen')"  id="tab-qr-imagen">🖼 QR desde imagen</button>
+        <button class="mode-tab" onclick="cambiarModo('ocr-imagen')" id="tab-ocr-imagen">🔍 OCR (sin QR)</button>
       </div>
 
+      <!-- MODO 1: Cámara QR -->
+      <div class="mode-panel active" id="panel-qr-camara">
+        <div id="reader"></div>
+        <div class="scanner-controls">
+          <button class="btn btn-primary" id="btnIniciar" onclick="iniciarEscaner()">📷 Iniciar cámara</button>
+          <button class="btn btn-ghost"   id="btnDetener" onclick="detenerEscaner()" disabled>⏹ Detener</button>
+          <button class="btn btn-ghost"   onclick="limpiarFormulario()">🔄 Limpiar</button>
+        </div>
+      </div>
+
+      <!-- MODO 2: Imagen con QR -->
+      <div class="mode-panel" id="panel-qr-imagen">
+        <div class="upload-zone" id="dropQR">
+          <input type="file" accept="image/*" onchange="leerQRDesdeImagen(event)" id="inputQR">
+          <span class="icon">📎</span>
+          <p>Arrastra o <span>selecciona una foto</span> del comprobante con QR</p>
+        </div>
+        <img id="previewQR" style="display:none; width:100%; border-radius:8px; margin-top:12px; max-height:260px; object-fit:contain;">
+      </div>
+
+      <!-- MODO 3: OCR (sin QR) — acepta imagen Y PDF -->
+      <div class="mode-panel" id="panel-ocr-imagen">
+        <div class="upload-zone" id="dropOCR">
+          <input type="file" accept="image/*,application/pdf" onchange="procesarConOCR(event)" id="inputOCR">
+          <span class="icon">🔍</span>
+          <p>Arrastra o <span>selecciona imagen o PDF</span> del comprobante</p>
+          <p style="margin-top:6px; font-size:0.72rem; color:var(--muted)">JPG · PNG · PDF — tickets, boletas manuales, facturas antiguas</p>
+        </div>
+
+        <!-- Preview imagen -->
+        <img id="previewOCR" style="display:none; width:100%; border-radius:8px; margin-top:12px; max-height:260px; object-fit:contain;">
+
+        <!-- Preview PDF (canvas) -->
+        <div id="pdfPreviewWrap" style="display:none; margin-top:12px;">
+          <div style="font-size:0.75rem; color:var(--muted); margin-bottom:6px;">📄 Vista previa del PDF (página 1)</div>
+          <canvas id="pdfCanvas" style="width:100%; border-radius:8px; border:1px solid var(--border);"></canvas>
+          <div id="pdfPaginas" style="font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center;"></div>
+        </div>
+
+        <div class="ocr-progress" id="ocrProgress">
+          <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocrBar"></div></div>
+          <div class="ocr-label" id="ocrLabel">Iniciando OCR…</div>
+        </div>
+        <div class="ocr-alert" id="ocrAlert" style="display:none">
+          ⚠ <strong>Modo OCR activo:</strong> Los campos se llenaron automáticamente pero pueden tener errores de lectura. <strong>Revisa cada campo antes de guardar.</strong>
+        </div>
+      </div>
+
+      <!-- Status global -->
       <div id="statusBadge" class="status status-idle">
         <span class="dot"></span>
-        <span id="statusText">Cámara inactiva</span>
+        <span id="statusText">Listo</span>
       </div>
 
-      <div class="divider" style="margin-top:16px">o ingresa datos manualmente</div>
     </div>
   </div>
 
@@ -253,6 +342,7 @@
     <div class="card-header">
       <span class="step">2</span>
       Datos del comprobante
+      <span id="fuenteTag" style="margin-left:auto; font-size:0.72rem; color:var(--muted);"></span>
     </div>
     <div class="card-body">
       <div class="form-grid">
@@ -265,6 +355,7 @@
             <option value="03">03 · Boleta de Venta</option>
             <option value="07">07 · Nota de Crédito</option>
             <option value="08">08 · Nota de Débito</option>
+            <option value="XX">Otro / No identificado</option>
           </select>
         </div>
 
@@ -275,12 +366,12 @@
 
         <div>
           <label>Serie</label>
-          <input type="text" id="serie" placeholder="F001 / B001" class="mono-field" maxlength="4" />
+          <input type="text" id="serie" placeholder="F001 / B001" class="mono-field" maxlength="6" />
         </div>
 
         <div>
           <label>Número</label>
-          <input type="text" id="numero" placeholder="00001234" class="mono-field" maxlength="8" />
+          <input type="text" id="numero" placeholder="00001234" class="mono-field" maxlength="10" />
         </div>
 
         <div class="full">
@@ -307,20 +398,20 @@
 
       <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-success" id="btnGuardar" onclick="guardarComprobante()">
-          <span>💾</span> Guardar comprobante
+          💾 Guardar comprobante
+        </button>
+        <button class="btn btn-ghost" onclick="limpiarFormulario()">
+          🔄 Limpiar campos
         </button>
       </div>
     </div>
   </div>
 
-  <!-- ══ PASO 3: RESUMEN ══ -->
+  <!-- ══ RESUMEN ══ -->
   <div class="card">
-    <div class="card-header">
-      <span class="step">3</span>
-      Resumen del mes
-    </div>
+    <div class="card-header"><span class="step">3</span> Resumen</div>
     <div class="card-body">
-      <div class="stats-grid" id="statsGrid">
+      <div class="stats-grid">
         <div class="stat"><div class="val" id="statTotal">S/ 0</div><div class="lbl">Total registrado</div></div>
         <div class="stat"><div class="val" id="statIgv">S/ 0</div><div class="lbl">IGV acumulado</div></div>
         <div class="stat"><div class="val" id="statCount">0</div><div class="lbl">Comprobantes</div></div>
@@ -333,9 +424,7 @@
     <div class="card-header">
       📋 Registros guardados
       <span style="margin-left:auto;">
-        <button class="btn btn-ghost" onclick="exportarCSV()" style="padding:6px 12px; font-size:0.75rem;">
-          ⬇ Exportar CSV
-        </button>
+        <button class="btn btn-ghost" onclick="exportarCSV()" style="padding:6px 12px; font-size:0.75rem;">⬇ Exportar CSV</button>
       </span>
     </div>
     <div class="table-wrap">
@@ -348,11 +437,12 @@
             <th>RUC Emisor</th>
             <th>IGV</th>
             <th>Total</th>
+            <th>Fuente</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="tablaRegistros">
-          <tr><td colspan="7"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún. Escanea el QR de tu primer comprobante.</div></td></tr>
+          <tr><td colspan="8"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -360,47 +450,56 @@
 
 </div>
 
-<!-- Toast -->
-<div id="toast">
-  <span id="toastIcon"></span>
-  <span id="toastMsg"></span>
-</div>
+<div id="toast"><span id="toastMsg"></span></div>
 
 <script>
 // ══════════════════════════════════════════════
-// CONFIGURACIÓN  ← Pega aquí tu URL de Apps Script
+// CONFIGURACIÓN
 // ══════════════════════════════════════════════
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbybCseypg7YLHDZ2r5HvFa90Aew2xOTWdYzqeQp6apF96yNBW_QBDoBxjU5i4KIUc6Q_Q/exec";
 
 // ══════════════════════════════════════════════
 // ESTADO
 // ══════════════════════════════════════════════
-let html5QrCode = null;
+let html5QrCode  = null;
 let scannerActivo = false;
-let registros = JSON.parse(localStorage.getItem('comprobantes') || '[]');
+let modoActual   = 'qr-camara';
+let fuenteActual = 'manual'; // 'qr' | 'ocr' | 'manual'
+let registros    = JSON.parse(localStorage.getItem('comprobantes') || '[]');
 
 // ══════════════════════════════════════════════
-// ESCÁNER QR
+// TABS / MODOS
+// ══════════════════════════════════════════════
+function cambiarModo(modo) {
+  if (scannerActivo) detenerEscaner();
+  modoActual = modo;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'  + modo).classList.add('active');
+  document.getElementById('panel-'+ modo).classList.add('active');
+  setStatus('idle','Listo');
+}
+
+// ══════════════════════════════════════════════
+// MODO 1: ESCÁNER QR CON CÁMARA
 // ══════════════════════════════════════════════
 async function iniciarEscaner() {
-  setStatus('scanning', 'Buscando código QR…');
+  setStatus('scanning','Buscando código QR…');
   document.getElementById('btnIniciar').disabled = true;
   document.getElementById('btnDetener').disabled = false;
-
   try {
     html5QrCode = new Html5Qrcode("reader");
     await html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      onQRLeido,
-      () => {}
+      { facingMode:"environment" },
+      { fps:10, qrbox:{width:250,height:250} },
+      onQRLeido, ()=>{}
     );
     scannerActivo = true;
-  } catch (err) {
-    setStatus('error', 'No se pudo acceder a la cámara');
+  } catch {
+    setStatus('error','No se pudo acceder a la cámara');
     document.getElementById('btnIniciar').disabled = false;
     document.getElementById('btnDetener').disabled = true;
-    mostrarToast('error', '❌ Permiso de cámara denegado o no disponible');
+    mostrarToast('err','❌ Permiso de cámara denegado');
   }
 }
 
@@ -410,58 +509,253 @@ async function detenerEscaner() {
     html5QrCode.clear();
     scannerActivo = false;
   }
-  setStatus('idle', 'Cámara inactiva');
-  document.getElementById('btnIniciar').disabled = false;
+  setStatus('idle','Cámara inactiva');
+  document.getElementById('btnIniciar').disabled  = false;
   document.getElementById('btnDetener').disabled = true;
 }
 
 // ══════════════════════════════════════════════
-// PROCESAMIENTO DEL QR DE SUNAT
-// Formato estándar: RUC|TipoDoc|Serie|Numero|IGV|Total|Fecha|TipoDoc2|RUCAdquirente|
+// MODO 2: QR DESDE IMAGEN (sin cámara)
+// ══════════════════════════════════════════════
+async function leerQRDesdeImagen(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const preview = document.getElementById('previewQR');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+
+  setStatus('scanning','Leyendo QR de la imagen…');
+  try {
+    const qrReader = new Html5Qrcode("panel-qr-imagen");
+    const resultado = await qrReader.scanFile(file, false);
+    onQRLeido(resultado);
+  } catch {
+    setStatus('warn','No se encontró QR en la imagen');
+    mostrarToast('warn','⚠ No hay QR legible — prueba con OCR');
+  }
+}
+
+// ══════════════════════════════════════════════
+// CALLBACK CUANDO SE LEE UN QR (ambos modos QR)
 // ══════════════════════════════════════════════
 function onQRLeido(texto) {
-  detenerEscaner();
+  if (scannerActivo) detenerEscaner();
 
   const partes = texto.split('|');
+  fuenteActual = 'qr';
 
   if (partes.length >= 6) {
-    // QR de SUNAT válido
+    // QR estándar SUNAT: RUC|TipoDoc|Serie|Numero|IGV|Total|Fecha|...
     const [rucEmisor, tipoDoc, serie, numero, igv, total, fecha] = partes;
 
-    llenarCampo('rucEmisor', rucEmisor.trim(), true);
-    llenarCampo('serie',     serie.trim(),     true);
-    llenarCampo('numero',    numero.trim(),    true);
-    llenarCampo('igv',       parseFloat(igv)  || '', true);
-    llenarCampo('total',     parseFloat(total) || '', true);
+    llenarCampo('rucEmisor', rucEmisor.trim(), 'qr');
+    llenarCampo('serie',     serie.trim(),     'qr');
+    llenarCampo('numero',    numero.trim(),    'qr');
+    llenarCampo('igv',       parseFloat(igv)  || 0, 'qr');
+    llenarCampo('total',     parseFloat(total) || 0, 'qr');
 
-    // Fecha: SUNAT usa DD/MM/YYYY → la convertimos a YYYY-MM-DD para el input
     if (fecha) {
-      const [d, m, y] = fecha.trim().split('/');
-      if (d && m && y) {
+      const partesFecha = fecha.trim().split('/');
+      if (partesFecha.length === 3) {
+        const [d,m,y] = partesFecha;
         document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
         document.getElementById('fecha').classList.add('filled');
       }
     }
 
-    // Tipo de comprobante
     const selectTipo = document.getElementById('tipo');
-    const opcion = [...selectTipo.options].find(o => o.value === tipoDoc.trim().padStart(2,'0'));
+    const codTipo = tipoDoc.trim().padStart(2,'0');
+    const opcion  = [...selectTipo.options].find(o => o.value === codTipo);
     if (opcion) selectTipo.value = opcion.value;
 
-    setStatus('ok', '✓ QR leído — Revisa y guarda');
-    mostrarToast('ok', '✅ Comprobante leído correctamente');
+    setStatus('ok','✓ QR leído — datos perfectos');
+    setFuenteTag('✅ Fuente: QR SUNAT (100% exacto)');
+    mostrarToast('ok','✅ Comprobante leído por QR');
   } else {
-    // No es QR de SUNAT — intentamos como texto genérico
-    setStatus('warn', 'QR no es de SUNAT — revisa los campos');
-    mostrarToast('warn', '⚠ QR leído pero no es formato SUNAT');
     document.getElementById('descripcion').value = texto;
+    setStatus('warn','QR leído pero no es formato SUNAT');
+    mostrarToast('warn','⚠ QR no estándar — completa los campos');
   }
 }
 
-function llenarCampo(id, valor, filled = false) {
-  const el = document.getElementById(id);
-  el.value = valor;
-  if (filled && valor !== '') el.classList.add('filled');
+// ══════════════════════════════════════════════
+// MODO 3: OCR CON TESSERACT — IMAGEN O PDF
+// ══════════════════════════════════════════════
+async function procesarConOCR(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const esPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  // Ocultar previews anteriores
+  document.getElementById('previewOCR').style.display      = 'none';
+  document.getElementById('pdfPreviewWrap').style.display  = 'none';
+
+  const progress = document.getElementById('ocrProgress');
+  const bar      = document.getElementById('ocrBar');
+  const label    = document.getElementById('ocrLabel');
+  const alertEl  = document.getElementById('ocrAlert');
+
+  progress.style.display = 'block';
+  alertEl.style.display  = 'none';
+  bar.style.width        = '0%';
+  fuenteActual = 'ocr';
+
+  try {
+    let textoTotal = '';
+    let imagenParaOCR; // ImageData o Blob que se pasa a Tesseract
+
+    if (esPDF) {
+      // ── Procesar PDF con PDF.js ──
+      setStatus('ocr', 'Leyendo PDF…');
+      label.textContent = 'Cargando PDF…';
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc      = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const totalPags   = pdfDoc.numPages;
+
+      document.getElementById('pdfPaginas').textContent =
+        `${totalPags} página${totalPags > 1 ? 's' : ''} — procesando todas`;
+      document.getElementById('pdfPreviewWrap').style.display = 'block';
+
+      const canvas  = document.getElementById('pdfCanvas');
+      const ctx     = canvas.getContext('2d');
+      const allBlobs = [];
+
+      for (let p = 1; p <= totalPags; p++) {
+        label.textContent = `Renderizando página ${p} de ${totalPags}…`;
+        bar.style.width   = Math.round((p / totalPags) * 40) + '%';
+
+        const page     = await pdfDoc.getPage(p);
+        const viewport = page.getViewport({ scale: 2.5 }); // escala alta = mejor OCR
+        canvas.width   = viewport.width;
+        canvas.height  = viewport.height;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Mostrar preview de la primera página
+        if (p === 1) canvas.style.display = 'block';
+
+        // Convertir canvas a blob para Tesseract
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+        allBlobs.push(blob);
+      }
+
+      // OCR sobre cada página y concatenar texto
+      const worker = await Tesseract.createWorker('spa', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const base = 40;
+            const pct  = base + Math.round(m.progress * (100 - base));
+            bar.style.width   = pct + '%';
+            label.textContent = `OCR en curso… ${pct}%`;
+          }
+        }
+      });
+
+      setStatus('ocr', `OCR del PDF (${totalPags} pág.)…`);
+      for (const blob of allBlobs) {
+        const { data: { text } } = await worker.recognize(blob);
+        textoTotal += '\n' + text;
+      }
+      await worker.terminate();
+
+    } else {
+      // ── Procesar IMAGEN normal ──
+      setStatus('ocr', 'Procesando imagen con OCR…');
+      const preview = document.getElementById('previewOCR');
+      preview.src   = URL.createObjectURL(file);
+      preview.style.display = 'block';
+
+      const worker = await Tesseract.createWorker('spa', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(m.progress * 100);
+            bar.style.width   = pct + '%';
+            label.textContent = `Reconociendo texto… ${pct}%`;
+          }
+        }
+      });
+
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+      textoTotal = text;
+    }
+
+    bar.style.width   = '100%';
+    label.textContent = 'Análisis completado ✓';
+
+    extraerDatosOCR(textoTotal);
+
+    setStatus('warn', 'OCR completado — revisa los campos');
+    setFuenteTag('⚠ Fuente: OCR (verifica datos)');
+    alertEl.style.display = 'block';
+    mostrarToast('warn', `⚠ OCR listo (${esPDF ? 'PDF' : 'imagen'}) — revisa cada campo`);
+
+    setTimeout(() => { progress.style.display = 'none'; }, 1800);
+
+  } catch (err) {
+    setStatus('error', 'Error al procesar archivo');
+    label.textContent = 'Error: ' + (err.message || 'No se pudo leer el archivo');
+    mostrarToast('err','❌ No se pudo procesar la imagen');
+  }
+}
+
+// ── Extrae datos del texto OCR con expresiones regulares ──
+function extraerDatosOCR(texto) {
+  const t = texto.toUpperCase();
+
+  // RUC: 11 dígitos que empiezan con 10 o 20
+  const rucMatch = texto.match(/\b(10|20)\d{9}\b/);
+  if (rucMatch) llenarCampo('rucEmisor', rucMatch[0], 'ocr');
+
+  // Serie-Número: patrones como F001-00001234, B001-12345678, E001-1
+  const serieMatch = texto.match(/\b([FBEC]\d{3})\s*[-–]\s*(\d{1,8})\b/i);
+  if (serieMatch) {
+    llenarCampo('serie',  serieMatch[1].toUpperCase(), 'ocr');
+    llenarCampo('numero', serieMatch[2].padStart(8,'0'), 'ocr');
+  }
+
+  // Tipo de comprobante por palabras clave
+  if      (t.includes('FACTURA'))           document.getElementById('tipo').value = '01';
+  else if (t.includes('BOLETA'))            document.getElementById('tipo').value = '03';
+  else if (t.includes('NOTA DE CRÉDITO') ||
+           t.includes('NOTA DE CREDITO'))   document.getElementById('tipo').value = '07';
+  else if (t.includes('NOTA DE DÉBITO') ||
+           t.includes('NOTA DE DEBITO'))    document.getElementById('tipo').value = '08';
+
+  // Fecha: DD/MM/YYYY o DD-MM-YYYY
+  const fechaMatch = texto.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (fechaMatch) {
+    const [,d,m,y] = fechaMatch;
+    document.getElementById('fecha').value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    document.getElementById('fecha').classList.add('ocr-filled');
+  }
+
+  // IGV: busca línea con "IGV" seguida de monto
+  const igvMatch = texto.match(/IGV\s*[:\s]\s*S?\/?\.?\s*([\d,]+\.?\d{0,2})/i);
+  if (igvMatch) llenarCampo('igv', parseMonto(igvMatch[1]), 'ocr');
+
+  // Total: busca TOTAL o IMPORTE TOTAL seguido de monto
+  const totalMatch = texto.match(/(?:TOTAL|IMPORTE TOTAL|PRECIO TOTAL)\s*[:\s]\s*S?\/?\.?\s*([\d,]+\.?\d{0,2})/i);
+  if (totalMatch) llenarCampo('total', parseMonto(totalMatch[1]), 'ocr');
+
+  // Si no encontró total, busca el número más grande como aproximación
+  if (!totalMatch) {
+    const montos = [...texto.matchAll(/S\/\.?\s*([\d,]+\.\d{2})/gi)]
+      .map(m => parseMonto(m[1])).filter(n => n > 0);
+    if (montos.length) {
+      const maxMonto = Math.max(...montos);
+      llenarCampo('total', maxMonto, 'ocr');
+    }
+  }
+}
+
+function parseMonto(str) {
+  return parseFloat(String(str).replace(/,/g,'')) || 0;
 }
 
 // ══════════════════════════════════════════════
@@ -473,46 +767,49 @@ async function guardarComprobante() {
   const serie  = document.getElementById('serie').value.trim().toUpperCase();
   const numero = document.getElementById('numero').value.trim();
   const ruc    = document.getElementById('rucEmisor').value.trim();
-  const igv    = parseFloat(document.getElementById('igv').value) || 0;
-  const total  = parseFloat(document.getElementById('total').value) || 0;
+  const igv    = parseFloat(document.getElementById('igv').value)    || 0;
+  const total  = parseFloat(document.getElementById('total').value)  || 0;
   const desc   = document.getElementById('descripcion').value.trim();
 
-  // Validación
-  if (!tipo || !fecha || !serie || !numero || !ruc) {
-    mostrarToast('warn', '⚠ Completa los campos obligatorios');
+  if (!tipo || !fecha || !serie || !numero) {
+    mostrarToast('warn','⚠ Completa tipo, fecha, serie y número');
     return;
   }
-  if (ruc.length !== 11 || !/^\d+$/.test(ruc)) {
-    mostrarToast('warn', '⚠ El RUC debe tener 11 dígitos');
+  if (ruc && (ruc.length !== 11 || !/^\d+$/.test(ruc))) {
+    mostrarToast('warn','⚠ El RUC debe tener exactamente 11 dígitos');
     return;
   }
 
-  const comprobante = { tipo, fecha, serie, numero, rucEmisor: ruc, igv, total, descripcion: desc, guardadoEn: new Date().toISOString() };
+  const comprobante = {
+    tipo, fecha, serie, numero,
+    rucEmisor: ruc, igv, total, descripcion: desc,
+    fuente: fuenteActual,
+    guardadoEn: new Date().toISOString()
+  };
 
-  // 1. Guardar en localStorage como respaldo local
+  // Guardar en localStorage como respaldo siempre
   registros.push(comprobante);
   localStorage.setItem('comprobantes', JSON.stringify(registros));
 
-  // 2. Enviar a Google Sheets si está configurado
+  // Enviar a Google Sheets si está configurado
   if (URL_APPS_SCRIPT && URL_APPS_SCRIPT !== "PEGA_AQUI_TU_URL_DE_GOOGLE_APPS_SCRIPT") {
     const btn = document.getElementById('btnGuardar');
     btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Guardando…';
+    btn.textContent = '⏳ Guardando…';
     try {
       await fetch(URL_APPS_SCRIPT, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        method:'POST', mode:'no-cors',
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify(comprobante)
       });
-      mostrarToast('ok', '✅ Guardado en la base de datos central');
+      mostrarToast('ok','✅ Guardado en Google Sheets');
     } catch {
-      mostrarToast('warn', '⚠ Sin conexión — guardado solo localmente');
+      mostrarToast('warn','⚠ Sin conexión — guardado localmente');
     }
     btn.disabled = false;
-    btn.innerHTML = '<span>💾</span> Guardar comprobante';
+    btn.innerHTML = '💾 Guardar comprobante';
   } else {
-    mostrarToast('ok', '✅ Guardado localmente (configura Apps Script para sincronizar)');
+    mostrarToast('ok','✅ Guardado localmente');
   }
 
   renderizarTabla();
@@ -523,28 +820,32 @@ async function guardarComprobante() {
 // ══════════════════════════════════════════════
 // RENDER TABLA
 // ══════════════════════════════════════════════
-const TIPOS = { '01':'Factura','03':'Boleta','07':'N.Crédito','08':'N.Débito' };
+const TIPOS = {'01':'Factura','03':'Boleta','07':'N.Crédito','08':'N.Débito','XX':'Otro'};
 
 function renderizarTabla() {
   const tbody = document.getElementById('tablaRegistros');
-  if (registros.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>`;
+  if (!registros.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><span class="icon">📭</span>Sin comprobantes aún.</div></td></tr>`;
     return;
   }
   tbody.innerHTML = [...registros].reverse().map((r, i) => {
     const idx = registros.length - 1 - i;
-    const badgeClass = `badge-${r.tipo || '01'}`;
+    const badgeClass = `badge-${r.tipo||'01'}`;
     const tipoLabel  = TIPOS[r.tipo] || r.tipo;
     const fechaFmt   = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
+    const fuenteBadge = r.fuente === 'qr'  ? '<span class="badge" style="background:#14532d;color:#86efac">QR</span>' :
+                        r.fuente === 'ocr' ? '<span class="badge badge-ocr">OCR</span>' :
+                                             '<span class="badge" style="background:#1e2030;color:var(--muted)">Manual</span>';
     return `
       <tr>
         <td><span class="badge ${badgeClass}">${tipoLabel}</span></td>
         <td>${fechaFmt}</td>
         <td class="mono-field">${r.serie}-${r.numero}</td>
-        <td class="mono-field" style="color:var(--muted)">${r.rucEmisor}</td>
-        <td class="total-cell">S/ ${r.igv.toFixed(2)}</td>
-        <td class="total-cell">S/ ${r.total.toFixed(2)}</td>
-        <td><button class="btn btn-danger" onclick="eliminarRegistro(${idx})" style="padding:4px 10px;font-size:0.72rem;">✕</button></td>
+        <td class="mono-field" style="color:var(--muted);font-size:0.75rem">${r.rucEmisor||'—'}</td>
+        <td class="total-cell">S/ ${(r.igv||0).toFixed(2)}</td>
+        <td class="total-cell">S/ ${(r.total||0).toFixed(2)}</td>
+        <td>${fuenteBadge}</td>
+        <td><button class="btn btn-danger" onclick="eliminarRegistro(${idx})" style="padding:4px 10px;font-size:0.72rem">✕</button></td>
       </tr>`;
   }).join('');
 }
@@ -558,41 +859,53 @@ function eliminarRegistro(idx) {
 }
 
 // ══════════════════════════════════════════════
-// ESTADÍSTICAS
+// STATS & CSV
 // ══════════════════════════════════════════════
 function actualizarStats() {
-  const totalSum = registros.reduce((a, r) => a + (r.total || 0), 0);
-  const igvSum   = registros.reduce((a, r) => a + (r.igv   || 0), 0);
-  document.getElementById('statTotal').textContent = `S/ ${totalSum.toFixed(2)}`;
-  document.getElementById('statIgv').textContent   = `S/ ${igvSum.toFixed(2)}`;
+  const tot = registros.reduce((a,r)=>a+(r.total||0),0);
+  const igv = registros.reduce((a,r)=>a+(r.igv||0),0);
+  document.getElementById('statTotal').textContent = `S/ ${tot.toFixed(2)}`;
+  document.getElementById('statIgv').textContent   = `S/ ${igv.toFixed(2)}`;
   document.getElementById('statCount').textContent = registros.length;
 }
 
-// ══════════════════════════════════════════════
-// EXPORTAR CSV
-// ══════════════════════════════════════════════
 function exportarCSV() {
-  if (registros.length === 0) { mostrarToast('warn', '⚠ No hay registros para exportar'); return; }
-  const cols = ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion'];
-  const rows = [cols.join(','), ...registros.map(r => cols.map(c => `"${r[c] ?? ''}"`).join(','))];
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  if (!registros.length) { mostrarToast('warn','⚠ No hay registros'); return; }
+  const cols = ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion','fuente'];
+  const rows = [cols.join(','), ...registros.map(r=>cols.map(c=>`"${r[c]??''}"`).join(','))];
+  const blob = new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = `comprobantes_${new Date().toISOString().slice(0,10)}.csv`;
+  const a    = Object.assign(document.createElement('a'),{href:url, download:`comprobantes_${new Date().toISOString().slice(0,10)}.csv`});
   a.click(); URL.revokeObjectURL(url);
-  mostrarToast('ok', '✅ CSV descargado');
+  mostrarToast('ok','✅ CSV descargado');
 }
 
 // ══════════════════════════════════════════════
 // UTILIDADES
 // ══════════════════════════════════════════════
+function llenarCampo(id, valor, fuente) {
+  const el = document.getElementById(id);
+  el.value = valor;
+  el.classList.remove('filled','ocr-filled');
+  if (valor !== '' && valor !== 0) {
+    el.classList.add(fuente === 'ocr' ? 'ocr-filled' : 'filled');
+  }
+}
+
 function limpiarFormulario() {
   ['tipo','fecha','serie','numero','rucEmisor','igv','total','descripcion'].forEach(id => {
     const el = document.getElementById(id);
-    el.value = '';
-    el.classList.remove('filled');
+    if (el.tagName === 'SELECT') el.value = '';
+    else el.value = '';
+    el.classList.remove('filled','ocr-filled');
   });
-  setStatus('idle', 'Cámara inactiva');
+  document.getElementById('ocrAlert').style.display        = 'none';
+  document.getElementById('previewOCR').style.display      = 'none';
+  document.getElementById('previewQR').style.display       = 'none';
+  document.getElementById('pdfPreviewWrap').style.display  = 'none';
+  setFuenteTag('');
+  fuenteActual = 'manual';
+  setStatus('idle','Listo');
 }
 
 function setStatus(tipo, txt) {
@@ -600,22 +913,24 @@ function setStatus(tipo, txt) {
   const dot   = badge.querySelector('.dot');
   badge.className = 'status status-' + tipo;
   document.getElementById('statusText').textContent = txt;
-  dot.className = 'dot' + (tipo === 'scanning' ? ' dot-pulse' : '');
+  dot.className = 'dot' + (['scanning','ocr'].includes(tipo) ? ' dot-pulse' : '');
+}
+
+function setFuenteTag(txt) {
+  document.getElementById('fuenteTag').textContent = txt;
 }
 
 let toastTimer;
 function mostrarToast(tipo, msg) {
   const t = document.getElementById('toast');
-  t.className = `t-${tipo}`;
+  t.className = 't-' + tipo;
   document.getElementById('toastMsg').textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3800);
 }
 
-// ══════════════════════════════════════════════
-// INICIO
-// ══════════════════════════════════════════════
+// ── Inicio ──
 renderizarTabla();
 actualizarStats();
 </script>
